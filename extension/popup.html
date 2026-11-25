@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>lazyBoi</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <span class="logo">lazyBoi</span>
+      <span class="tag">form ⇄ AI chat</span>
+    </header>
+
+    <section>
+      <h2>1 · Scan the form</h2>
+      <button id="scan" class="primary">Scan this form</button>
+      <div id="session" hidden>
+        <div id="session-meta" class="meta"></div>
+        <details>
+          <summary>Fields found</summary>
+          <ul id="fields"></ul>
+        </details>
+        <div id="skipped" class="skipped" hidden></div>
+        <button id="copy">Copy prompt for my AI chat</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>2 · Paste the AI's reply</h2>
+      <textarea id="reply" placeholder="Paste the whole reply (or just the lazyboi block). Works from any tab."></textarea>
+      <div class="row">
+        <button id="paste">Paste from clipboard</button>
+        <button id="preview" class="primary">Preview &amp; fill</button>
+      </div>
+    </section>
+
+    <section class="dock-row">
+      <label><input type="checkbox" id="show-dock" checked /> Show the lazyBoi dock on this site</label>
+    </section>
+
+    <div id="status" class="status"></div>
+    <footer>Never submits forms · never touches passwords, cards or IDs</footer>
+    <script src="popup.js"></script>
+  </body>
+</html>

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Dynamic / multi-step · lazyBoi playground</title>
+    <link rel="stylesheet" href="playground.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Dynamic / multi-step form</h1>
+      <p class="lead">Fields appear based on answers and steps. Rescan after the form changes.</p>
+      <form id="dyn">
+        <div class="step" data-step="1">
+          <section class="card">
+            <h2>Step 1 of 2 · About you</h2>
+            <div class="f"><label for="d-name">Full name</label><input id="d-name" name="name" /></div>
+            <div class="f">
+              <label for="d-status">Current status</label>
+              <select id="d-status" name="status">
+                <option value="">Select…</option>
+                <option value="student">Student</option>
+                <option value="employed">Employed</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div id="student-fields" hidden>
+              <div class="f"><label for="d-school">School</label><input id="d-school" name="school" /></div>
+              <div class="f"><label for="d-program">Program</label><input id="d-program" name="program" /></div>
+              <div class="f"><label for="d-year">Year of study</label><input id="d-year" name="year" type="number" min="1" max="8" /></div>
+            </div>
+            <div id="employed-fields" hidden>
+              <div class="f"><label for="d-employer">Employer</label><input id="d-employer" name="employer" /></div>
+            </div>
+            <button type="button" id="next">Next →</button>
+          </section>
+        </div>
+        <div class="step" data-step="2" hidden>
+          <section class="card">
+            <h2>Step 2 of 2 · Links</h2>
+            <div id="links">
+              <div class="f"><label for="link-1">Link 1</label><input id="link-1" name="links[]" type="url" /></div>
+            </div>
+            <button type="button" id="add-link">+ Add another link</button>
+            <div class="f" style="margin-top: 12px">
+              <label for="d-notes">Anything else?</label>
+              <textarea id="d-notes" name="notes"></textarea>
+            </div>
+            <button type="button" id="back">← Back</button>
+            <button class="submit" type="submit">Finish</button>
+          </section>
+        </div>
+      </form>
+    </main>
+    <script>
+      const status = document.getElementById("d-status");
+      status.addEventListener("change", () => {
+        document.getElementById("student-fields").hidden = status.value !== "student";
+        document.getElementById("employed-fields").hidden = status.value !== "employed";
+      });
+      const steps = document.querySelectorAll(".step");
+      const show = (n) => steps.forEach((s) => (s.hidden = s.dataset.step !== String(n)));
+      document.getElementById("next").addEventListener("click", () => show(2));
+      document.getElementById("back").addEventListener("click", () => show(1));
+      let n = 1;
+      document.getElementById("add-link").addEventListener("click", () => {
+        n++;
+        const div = document.createElement("div");
+        div.className = "f";
+        div.innerHTML = `<label for="link-${n}">Link ${n}</label><input id="link-${n}" name="links[]" type="url" />`;
+        document.getElementById("links").append(div);
+      });
+    </script>
+    <script src="playground.js"></script>
+  </body>
+</html>

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Framework-controlled inputs · lazyBoi playground</title>
+    <link rel="stylesheet" href="playground.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Framework-controlled inputs</h1>
+      <p class="lead">
+        Mimics React: each input's value is owned by app state. Writing <code>el.value = "x"</code> without a proper input event
+        is ignored and reverted on the next render. The state panel shows the <strong>app state</strong>, not the DOM.
+      </p>
+      <form id="fw">
+        <div class="f"><label for="fw-name">Full name</label><input id="fw-name" data-key="fullName" /></div>
+        <div class="f"><label for="fw-email">Work email</label><input id="fw-email" type="email" data-key="email" /></div>
+        <div class="f"><label for="fw-role">Current role</label><input id="fw-role" data-key="role" /></div>
+        <div class="f"><label for="fw-summary">Summary</label><textarea id="fw-summary" data-key="summary" maxlength="500"></textarea></div>
+        <div class="f">
+          <label for="fw-team">Team</label>
+          <select id="fw-team" data-key="team">
+            <option value="">Choose…</option>
+            <option value="platform">Platform</option>
+            <option value="product">Product</option>
+            <option value="data">Data</option>
+          </select>
+        </div>
+        <div class="f"><label><input type="checkbox" id="fw-oncall" data-key="onCall" /> Joins on-call rotation</label></div>
+        <button class="submit" type="submit">Save</button>
+      </form>
+    </main>
+    <script>
+      // A tiny "framework": state is the source of truth; inputs are re-rendered from it.
+      const state = { fullName: "", email: "", role: "", summary: "", team: "", onCall: false };
+      const els = document.querySelectorAll("[data-key]");
+
+      // React-style value tracker: instance-level `value`/`checked` setters record the last value React
+      // "knows". An input event whose DOM value equals the tracked value is treated as a no-op.
+      for (const el of els) {
+        const proto = Object.getPrototypeOf(el);
+        const prop = el.type === "checkbox" ? "checked" : "value";
+        const desc = Object.getOwnPropertyDescriptor(proto, prop);
+        let tracked = desc.get.call(el);
+        Object.defineProperty(el, prop, {
+          configurable: true,
+          get() { return desc.get.call(this); },
+          set(v) { tracked = v; desc.set.call(this, v); },
+        });
+        el._tracked = () => tracked;
+        el._setTracked = (v) => (tracked = v);
+        const onEvent = () => {
+          const cur = desc.get.call(el);
+          if (cur === tracked) return; // React would not notice this change
+          tracked = cur;
+          state[el.dataset.key] = cur;
+        };
+        el.addEventListener(el.type === "checkbox" ? "click" : "input", onEvent);
+        el.addEventListener("change", onEvent);
+      }
+
+      function render() {
+        for (const el of els) {
+          const k = el.dataset.key;
+          if (el.type === "checkbox") { if (el.checked !== state[k]) el.checked = state[k]; }
+          else if (el.value !== state[k]) el.value = state[k];
+        }
+      }
+      setInterval(render, 300);
+      document.addEventListener("focusout", () => setTimeout(render, 0));
+
+      window.appState = state;
+      window.customState = () =>
+        Object.entries(state)
+          .map(([k, v]) => `<tr class="${v ? "changed" : ""}"><td>state.${k}</td><td>${String(v).replace(/</g, "&lt;") || "<span style=color:#bbb>—</span>"}</td></tr>`)
+          .join("");
+    </script>
+    <script src="playground.js"></script>
+  </body>
+</html>

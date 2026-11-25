@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "lazyBoi",
+  "version": "0.2.0",
+  "description": "Let any web form talk to any AI chat: copy a form, ask your AI, preview and fill.",
+  "action": {
+    "default_title": "lazyBoi",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": ["activeTab", "scripting", "storage", "clipboardWrite", "clipboardRead"]
+}

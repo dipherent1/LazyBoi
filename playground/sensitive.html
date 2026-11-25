@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Checkout · lazyBoi playground</title>
+    <link rel="stylesheet" href="playground.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Account &amp; payment</h1>
+      <p class="lead">Only the name, email and note may be filled. Everything else must appear as "not touched".</p>
+      <form id="pay">
+        <div class="f"><label for="s-name">Name on account</label><input id="s-name" name="name" /></div>
+        <div class="f"><label for="s-email">Email</label><input id="s-email" name="email" type="email" /></div>
+        <div class="f"><label for="s-pw">Password</label><input id="s-pw" name="pw" type="password" /></div>
+        <div class="f"><label for="s-pin">Account PIN</label><input id="s-pin" name="pin" inputmode="numeric" /></div>
+        <div class="f"><label for="s-card">Card number</label><input id="s-card" name="cardNumber" autocomplete="cc-number" /></div>
+        <div class="row2">
+          <div class="f"><label for="s-exp">Expiration date</label><input id="s-exp" name="exp" placeholder="MM/YY" /></div>
+          <div class="f"><label for="s-cvv">CVV</label><input id="s-cvv" name="cvv" /></div>
+        </div>
+        <div class="f"><label for="s-ssn">Social Security Number</label><input id="s-ssn" name="ssn" /></div>
+        <div class="f"><label for="s-sin">SIN</label><input id="s-sin" name="sin_number" /></div>
+        <div class="f"><label for="s-routing">Bank routing number</label><input id="s-routing" name="routing" /></div>
+        <div class="f"><label for="s-otp">Verification code</label><input id="s-otp" name="code" autocomplete="one-time-code" /></div>
+        <div class="f"><label for="s-mystery">Field 7</label><input id="s-mystery" name="cc_num" /></div>
+        <div class="f"><label for="s-note">Order note</label><textarea id="s-note" name="note"></textarea></div>
+        <button class="submit" type="submit">Pay</button>
+      </form>
+    </main>
+    <script src="playground.js"></script>
+  </body>
+</html>

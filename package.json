@@ -1,0 +1,22 @@
+{
+  "name": "lazyboi",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Let any web form talk to any AI chat. Phase 1: scanner, filler, preview, copy/paste transport.",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "watch": "node scripts/build.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "playground": "node scripts/serve.mjs",
+    "check": "npm run typecheck && npm test && npm run build"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.287",
+    "esbuild": "^0.24.0",
+    "jsdom": "^25.0.1",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  }
+}

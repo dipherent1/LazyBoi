@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>lazyBoi playground</title>
+    <link rel="stylesheet" href="playground.css" />
+  </head>
+  <body>
+    <div style="max-width: 1100px; margin: 0 auto; padding: 20px">
+      <h1>lazyBoi playground</h1>
+      <p class="lead">
+        Test forms for the lazyBoi extension. Each page stresses a different kind of form. The right-hand panel shows the
+        live form state, and counts submits (lazyBoi must never submit). Add <code>?harness</code> to any page (or use the
+        toggle in the top bar) to run lazyBoi in the page without installing the extension.
+      </p>
+      <div class="cards">
+        <a href="basic.html"><h3>Basic</h3><p>Text, email, phone, URL, number, date, textarea, limits, required.</p></a>
+        <a href="choices.html"><h3>Choices</h3><p>Select, multi-select, radios, checkboxes, checkbox groups, datalist.</p></a>
+        <a href="linkedin.html"><h3>LinkedIn-like profile</h3><p>Headline, About, repeated Experience and Project sections.</p></a>
+        <a href="job.html"><h3>Job application</h3><p>Multi-section, file upload, yes/no, essays.</p></a>
+        <a href="framework.html"><h3>Framework inputs</h3><p>React-style controlled inputs that ignore plain value writes.</p></a>
+        <a href="dynamic.html"><h3>Dynamic / multi-step</h3><p>Conditional fields, Next steps, "Add another".</p></a>
+        <a href="richtext.html"><h3>Rich text</h3><p>contenteditable editors.</p></a>
+        <a href="frames.html"><h3>Iframe + shadow DOM</h3><p>Fields inside a same-origin iframe and a web component.</p></a>
+        <a href="sensitive.html"><h3>Sensitive</h3><p>Password, card, CVV, SSN: must be skipped.</p></a>
+        <a href="labels.html"><h3>Odd labels</h3><p>aria-label, placeholder only, label after input, unlabeled.</p></a>
+        <a href="chat.html"><h3>Mock AI chat</h3><p>A fake chat that answers with sample values, to test the widget's Paste and Copy buttons.</p></a>
+      </div>
+    </div>
+    <script src="playground.js"></script>
+  </body>
+</html>

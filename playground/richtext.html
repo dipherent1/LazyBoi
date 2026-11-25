@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Rich text · lazyBoi playground</title>
+    <link rel="stylesheet" href="playground.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Rich text editors</h1>
+      <p class="lead">contenteditable areas like the ones LinkedIn, Notion or job portals use.</p>
+      <form id="rt">
+        <div class="f">
+          <span class="q" id="cover-label">Cover letter</span>
+          <div class="editor">
+            <div class="toolbar"><button type="button" data-cmd="bold"><b>B</b></button><button type="button" data-cmd="italic"><i>I</i></button></div>
+            <div contenteditable="true" role="textbox" aria-multiline="true" aria-labelledby="cover-label" data-placeholder="Write your cover letter…" data-maxlength="3000"></div>
+          </div>
+        </div>
+        <div class="f">
+          <span class="q">Post update</span>
+          <div class="editor">
+            <div contenteditable="true" role="textbox" aria-label="What do you want to talk about?" data-placeholder="What do you want to talk about?"></div>
+          </div>
+        </div>
+        <div class="f">
+          <label for="rt-title">Post title</label>
+          <input id="rt-title" name="title" />
+        </div>
+        <button class="submit" type="submit">Publish</button>
+      </form>
+      <p class="hint">Editor input events seen: <span id="rt-events">0</span></p>
+    </main>
+    <script>
+      let events = 0;
+      document.querySelectorAll("[contenteditable]").forEach((ed) =>
+        ed.addEventListener("input", () => (document.getElementById("rt-events").textContent = ++events)),
+      );
+      document.querySelectorAll("[data-cmd]").forEach((b) => b.addEventListener("click", () => document.execCommand(b.dataset.cmd)));
+    </script>
+    <script src="playground.js"></script>
+  </body>
+</html>

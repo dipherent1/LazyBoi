@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Basic contact form · lazyBoi playground</title>
+    <link rel="stylesheet" href="playground.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Basic contact form</h1>
+      <p class="lead">Standard input types, with and without limits.</p>
+      <form id="basic">
+        <div class="row2">
+          <div class="f"><label for="first">First name *</label><input id="first" name="firstName" type="text" required autocomplete="given-name" /></div>
+          <div class="f"><label for="last">Last name *</label><input id="last" name="lastName" type="text" required autocomplete="family-name" /></div>
+        </div>
+        <div class="f"><label for="email">Email</label><input id="email" name="email" type="email" autocomplete="email" /></div>
+        <div class="f"><label for="phone">Phone number</label><input id="phone" name="phone" type="tel" autocomplete="tel" placeholder="+1 555 555 5555" /></div>
+        <div class="f"><label for="site">Personal website</label><input id="site" name="website" type="url" placeholder="https://" /></div>
+        <div class="row2">
+          <div class="f"><label for="age">Years of experience</label><input id="age" name="years" type="number" min="0" max="60" /></div>
+          <div class="f"><label for="dob">Available from</label><input id="dob" name="startDate" type="date" /></div>
+        </div>
+        <div class="f">
+          <label for="tagline">Tagline</label>
+          <input id="tagline" name="tagline" type="text" maxlength="60" />
+          <span class="hint">Max 60 characters</span>
+        </div>
+        <div class="f">
+          <label for="bio">Short bio</label>
+          <textarea id="bio" name="bio" maxlength="300" placeholder="A few sentences about you"></textarea>
+          <span class="hint">Max 300 characters</span>
+        </div>
+        <div class="f"><label for="city">City</label><input id="city" name="city" type="text" autocomplete="address-level2" /></div>
+        <div class="f"><label for="disabled">Account ID (read-only)</label><input id="disabled" name="accountRef" type="text" value="AC-0042" readonly /></div>
+        <input type="hidden" name="csrf" value="abc123" />
+        <button class="submit" type="submit">Submit</button>
+      </form>
+    </main>
+    <script src="playground.js"></script>
+  </body>
+</html>

@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Edit profile · lazyBoi playground</title>
+    <link rel="stylesheet" href="playground.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Edit profile</h1>
+      <p class="lead">A LinkedIn-style profile editor with repeated sections.</p>
+      <form id="profile">
+        <section class="card">
+          <h2>Intro</h2>
+          <div class="f">
+            <label for="headline">Headline *</label>
+            <input id="headline" name="headline" type="text" maxlength="220" required />
+            <span class="hint">Up to 220 characters</span>
+          </div>
+          <div class="f">
+            <label for="industry">Industry</label>
+            <select id="industry" name="industry">
+              <option value="">Select…</option>
+              <option>Software Development</option>
+              <option>IT Services and IT Consulting</option>
+              <option>Higher Education</option>
+              <option>Financial Services</option>
+              <option>Research Services</option>
+            </select>
+          </div>
+          <div class="f"><label for="location">Location</label><input id="location" name="location" type="text" placeholder="City, Country" /></div>
+        </section>
+
+        <section class="card">
+          <h2>About</h2>
+          <div class="f">
+            <label for="about">Summary</label>
+            <textarea id="about" name="about" maxlength="2600" rows="6"></textarea>
+            <span class="hint">Up to 2,600 characters</span>
+          </div>
+        </section>
+
+        <section class="card" data-section="Experience #1">
+          <h3>Experience #1</h3>
+          <div class="f"><label for="exp1-title">Title *</label><input id="exp1-title" name="experience[0].title" type="text" required /></div>
+          <div class="row2">
+            <div class="f">
+              <label for="exp1-type">Employment type</label>
+              <select id="exp1-type" name="experience[0].type">
+                <option value="">Please select</option>
+                <option value="ft">Full-time</option>
+                <option value="pt">Part-time</option>
+                <option value="intern">Internship</option>
+                <option value="contract">Contract</option>
+              </select>
+            </div>
+            <div class="f"><label for="exp1-company">Company name *</label><input id="exp1-company" name="experience[0].company" type="text" required /></div>
+          </div>
+          <div class="f"><label><input type="checkbox" name="experience[0].current" /> I am currently working in this role</label></div>
+          <div class="row2">
+            <div class="f">
+              <label for="exp1-sm">Start month</label>
+              <select id="exp1-sm" name="experience[0].startMonth">
+                <option value="">Month</option>
+                <option value="1">January</option><option value="2">February</option><option value="3">March</option>
+                <option value="4">April</option><option value="5">May</option><option value="6">June</option>
+                <option value="7">July</option><option value="8">August</option><option value="9">September</option>
+                <option value="10">October</option><option value="11">November</option><option value="12">December</option>
+              </select>
+            </div>
+            <div class="f">
+              <label for="exp1-sy">Start year</label>
+              <select id="exp1-sy" name="experience[0].startYear">
+                <option value="">Year</option>
+                <option>2026</option><option>2025</option><option>2024</option><option>2023</option><option>2022</option><option>2021</option><option>2020</option>
+              </select>
+            </div>
+          </div>
+          <div class="f"><label for="exp1-desc">Description</label><textarea id="exp1-desc" name="experience[0].description" maxlength="2000"></textarea></div>
+        </section>
+
+        <section class="card" data-section="Experience #2">
+          <h3>Experience #2</h3>
+          <div class="f"><label for="exp2-title">Title *</label><input id="exp2-title" name="experience[1].title" type="text" /></div>
+          <div class="f"><label for="exp2-company">Company name *</label><input id="exp2-company" name="experience[1].company" type="text" /></div>
+          <div class="f"><label for="exp2-desc">Description</label><textarea id="exp2-desc" name="experience[1].description" maxlength="2000"></textarea></div>
+        </section>
+
+        <section class="card" data-section="Project #1">
+          <h3>Project #1</h3>
+          <div class="f"><label for="p1-name">Project name *</label><input id="p1-name" name="projects[0].name" type="text" maxlength="255" /></div>
+          <div class="f"><label for="p1-url">Project URL</label><input id="p1-url" name="projects[0].url" type="url" /></div>
+          <div class="f"><label for="p1-desc">Description</label><textarea id="p1-desc" name="projects[0].description" maxlength="2000"></textarea></div>
+          <div class="f"><label for="p1-skills">Skills (comma separated)</label><input id="p1-skills" name="projects[0].skills" type="text" /></div>
+        </section>
+
+        <section class="card" data-section="Project #2">
+          <h3>Project #2</h3>
+          <div class="f"><label for="p2-name">Project name *</label><input id="p2-name" name="projects[1].name" type="text" maxlength="255" /></div>
+          <div class="f"><label for="p2-desc">Description</label><textarea id="p2-desc" name="projects[1].description" maxlength="2000"></textarea></div>
+        </section>
+
+        <button class="submit" type="submit">Save</button>
+      </form>
+    </main>
+    <script src="playground.js"></script>
+  </body>
+</html>

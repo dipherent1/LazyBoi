@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Iframe + shadow DOM · lazyBoi playground</title>
+    <link rel="stylesheet" href="playground.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Iframe + shadow DOM</h1>
+      <p class="lead">Fields inside a same-origin iframe and inside a web component's open shadow root.</p>
+      <form id="outer">
+        <div class="f"><label for="o-name">Name (top page)</label><input id="o-name" name="outerName" /></div>
+      </form>
+
+      <section class="card">
+        <h2>Embedded application (iframe)</h2>
+        <iframe src="frame-inner.html" title="Embedded form" style="width: 100%; height: 260px; border: 1px dashed #c8c8d2; border-radius: 8px"></iframe>
+      </section>
+
+      <section class="card">
+        <h2>Web component</h2>
+        <address-card></address-card>
+      </section>
+    </main>
+    <script>
+      customElements.define(
+        "address-card",
+        class extends HTMLElement {
+          constructor() {
+            super();
+            const root = this.attachShadow({ mode: "open" });
+            root.innerHTML = `
+              <style>label{display:block;font:500 14px system-ui;margin:8px 0 4px} input{font:inherit;padding:6px 8px;border:1px solid #c8c8d2;border-radius:7px;width:100%}</style>
+              <fieldset style="border:0;padding:0;margin:0">
+                <legend style="font:600 14px system-ui">Mailing address</legend>
+                <label for="street">Street address</label><input id="street" name="street" autocomplete="street-address">
+                <label for="city">City</label><input id="city" name="city">
+                <label for="postal">Postal code</label><input id="postal" name="postal" autocomplete="postal-code">
+              </fieldset>`;
+          }
+        },
+      );
+    </script>
+    <script src="playground.js"></script>
+  </body>
+</html>

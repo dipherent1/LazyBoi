@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Odd labels · lazyBoi playground</title>
+    <link rel="stylesheet" href="playground.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Odd labels</h1>
+      <p class="lead">Every field below should still get a sensible label.</p>
+      <form id="odd">
+        <div class="f"><input aria-label="Preferred name" name="x1" /></div>
+        <div class="f"><input placeholder="Your pronouns (optional)" name="x2" /></div>
+        <div class="f inline"><input id="x3" name="x3" /> <label for="x3">Label after the input: nickname</label></div>
+        <div class="f"><input name="emergency_contact_name" /></div>
+        <div class="f"><span id="t1">Twitter / X handle</span><input aria-labelledby="t1" name="x5" /></div>
+        <div class="f"><input title="Favourite programming language" name="x6" /></div>
+        <div class="f">Graduation year <input name="x7" type="number" /></div>
+        <div class="f">
+          <label>Wrapped label: hometown <input name="x8" /></label>
+        </div>
+        <table>
+          <tr><td>Office extension</td><td><input name="x9" type="tel" /></td></tr>
+        </table>
+        <button class="submit" type="submit">Save</button>
+      </form>
+    </main>
+    <script src="playground.js"></script>
+  </body>
+</html>
