@@ -1,4 +1,4 @@
-// Playground harness: runs the same scanner/filler/overlay/widget directly in a page, without the extension.
+// Playground harness: runs the same scanner/filler/widget directly in a page, without the extension.
 // Loaded by playground pages when the URL has ?harness. Exposes window.lazyBoi for manual and automated tests.
 import { buildPrompt, extractReply } from "./shared/protocol";
 import type { FieldValue, FormSchema } from "./shared/types";
@@ -21,8 +21,8 @@ const api = {
   scan: (session = newId()): FormSchema => controller.scan(session),
   prompt: () => buildPrompt(requireScan().schema),
   extract: extractReply,
-  /** Open the preview overlay from pasted chat text or a values object. */
-  preview(input: string | Record<string, FieldValue>) {
+  /** Apply pasted chat text or a values object to the form (no preview step). */
+  apply(input: string | Record<string, FieldValue>) {
     const c = requireScan();
     let values: Record<string, FieldValue>;
     if (typeof input === "string") {
@@ -33,8 +33,9 @@ const api = {
       }
       values = ex.reply.values;
     } else values = input;
-    const r = controller.preview(c.session, values, []);
+    const r = controller.apply(c.session, values);
     if (!r.ok) throw new Error(r.error);
+    return r.summary;
   },
   /** Fill directly, no overlay (for automated checks). */
   fill(values: Record<string, FieldValue>) {
@@ -65,6 +66,6 @@ declare global {
 window.lazyBoi = api;
 
 const chatMode = location.pathname.endsWith("/chat.html");
-const start = () => mountWidget({ mode: chatMode ? "chat" : "form", backend: createLocalBackend(controller), countFields: () => controller.peek() });
+const start = () => mountWidget({ mode: chatMode ? "chat" : "form", backend: createLocalBackend(controller) });
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start, { once: true });
 else start();

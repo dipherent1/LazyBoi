@@ -4,7 +4,6 @@ import type { Field, FieldOption, FieldType, FormSchema, SkippedField } from "..
 import { PROTOCOL_VERSION } from "../shared/types";
 import { isSensitive } from "../shared/sensitive";
 
-export const OVERLAY_HOST_ID = "lazyboi-overlay-host";
 export const WIDGET_HOST_ID = "lazyboi-widget-host";
 
 export type BindingKind = "input" | "textarea" | "select" | "radio" | "checkbox" | "checkbox-group" | "richtext";
@@ -32,7 +31,7 @@ const idCache = new WeakMap<Element, string>();
 
 function collect(root: ParentNode, out: HTMLElement[]): void {
   for (const child of Array.from(root.children) as HTMLElement[]) {
-    if (child.id === OVERLAY_HOST_ID || child.id === WIDGET_HOST_ID) continue;
+    if (child.id === WIDGET_HOST_ID) continue;
     out.push(child);
     if (child.shadowRoot) collect(child.shadowRoot, out);
     if (child.tagName === "IFRAME") {

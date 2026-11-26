@@ -1,7 +1,7 @@
 // Playground-only backend: state lives in localStorage and tabs talk over a BroadcastChannel,
 // so the form page and the mock chat page can run the whole loop without the extension installed.
 import { extractReply } from "../shared/protocol";
-import type { FormSchema } from "../shared/types";
+import type { FieldValue, FormSchema } from "../shared/types";
 import type { Res, WidgetBackend } from "./backend";
 import type { FormController } from "./session";
 
@@ -31,8 +31,9 @@ export function createLocalBackend(controller: FormController): WidgetBackend {
   const pageId = Math.random().toString(36).slice(2);
   const channel = new BroadcastChannel("lazyboi-h");
   channel.onmessage = (e) => {
-    const m = e.data as { kind?: string; page?: string; session?: string; values?: Record<string, never> };
-    if (m?.kind === "preview" && m.page === pageId && m.session && m.values) controller.preview(m.session, m.values, []);
+    const m = e.data as { kind?: string; page?: string; session?: string; values?: Record<string, FieldValue> };
+    if (m?.kind === "fill" && m.page === pageId && m.session && m.values) controller.apply(m.session, m.values);
+    if (m?.kind === "undo") controller.undo();
   };
 
   const newest = (pred: (e: Entry) => boolean = () => true): Entry | undefined =>
@@ -40,14 +41,17 @@ export function createLocalBackend(controller: FormController): WidgetBackend {
       .filter(pred)
       .sort((a, b) => b.createdAt - a.createdAt)[0];
 
-  async function route(text: string, fallback?: string): Promise<Res> {
+  async function route(text: string, fallback?: string): Promise<Res<{ summary?: import("../shared/types").FillSummary }>> {
     const ex = extractReply(text);
     if (!ex.ok) return ex;
     const id = ex.reply.session ?? fallback;
     const entry = id ? read().sessions[id] : undefined;
     if (!id || !entry) return { ok: false, error: id ? `No form session "${id}". Copy the form again and re-ask the AI.` : "The reply has no session id." };
-    if (entry.page === pageId) return controller.preview(id, ex.reply.values, []);
-    channel.postMessage({ kind: "preview", page: entry.page, session: id, values: ex.reply.values });
+    if (entry.page === pageId) {
+      const r = controller.apply(id, ex.reply.values);
+      return r.ok ? { ok: true, summary: r.summary } : r;
+    }
+    channel.postMessage({ kind: "fill", page: entry.page, session: id, values: ex.reply.values });
     return { ok: true };
   }
 
@@ -86,6 +90,11 @@ export function createLocalBackend(controller: FormController): WidgetBackend {
       store.pending[entry.id] = text;
       write(store);
       return { ok: true, session: entry.id, formTitle: entry.schema.page.title || "your form" };
+    },
+    async undo() {
+      const n = controller.undo();
+      if (n === 0) channel.postMessage({ kind: "undo" });
+      return { ok: true, restored: n };
     },
   };
 }

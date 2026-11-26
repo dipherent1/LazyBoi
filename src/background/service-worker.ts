@@ -1,17 +1,8 @@
-// Session manager: creates sessions on scan, routes replies to the right tab by session ID,
+// Session manager: creates sessions when a form is copied, routes replies to the right tab by session ID,
 // and serves the on-page widget (form pages and chat pages).
-import type {
-  ContentRequest,
-  ContentScanResponse,
-  Fail,
-  PopupRequest,
-  ReplyResponse,
-  ScanResponse,
-  StatusMessage,
-  WidgetRequest,
-} from "../shared/messages";
+import type { ContentRequest, ContentScanResponse, Fail, ReplyResponse, ScanResponse, StatusMessage, WidgetRequest } from "../shared/messages";
 import { extractReply } from "../shared/protocol";
-import { SESSION_TTL_MS, type SessionRecord } from "../shared/types";
+import { SESSION_TTL_MS, type FillSummary, type SessionRecord } from "../shared/types";
 
 const KEY = "sessions";
 const PENDING = "pending";
@@ -74,22 +65,7 @@ function sendToTab<T>(tabId: number, msg: ContentRequest): Promise<T> {
   return chrome.tabs.sendMessage(tabId, msg) as Promise<T>;
 }
 
-async function ensureContentScript(tabId: number): Promise<void> {
-  try {
-    const pong = await sendToTab<{ ok: boolean }>(tabId, { kind: "lb:ping" });
-    if (pong?.ok) return;
-  } catch {
-    /* not injected yet */
-  }
-  await chrome.scripting.executeScript({ target: { tabId }, files: ["content.js"] });
-}
-
 async function scanTab(tabId: number): Promise<ScanResponse> {
-  try {
-    await ensureContentScript(tabId);
-  } catch {
-    return { ok: false, error: "lazyBoi can't run on this page (browser pages, the Web Store and some PDFs are off limits)." };
-  }
   const all = await load();
   const id = newId(all);
   let res: ContentScanResponse;
@@ -121,17 +97,12 @@ async function scanTab(tabId: number): Promise<ScanResponse> {
 async function routeReply(text: string, fallbackSession?: string): Promise<ReplyResponse> {
   const ex = extractReply(text);
   if (!ex.ok) return ex;
-  const notes: string[] = [];
-  let sessionId = ex.reply.session;
-  if (!sessionId) {
-    if (!fallbackSession) return { ok: false, error: 'The reply has no "session" id, and there is no scanned form to match it to.' };
-    sessionId = fallbackSession;
-    notes.push(`The reply had no session id; matched it to the form (${sessionId}).`);
-  }
+  const sessionId = ex.reply.session ?? fallbackSession;
+  if (!sessionId) return { ok: false, error: 'The reply has no "session" id, and there is no copied form to match it to.' };
   const all = await load();
   const rec = all[sessionId];
   if (!rec) return { ok: false, error: `No form session "${sessionId}". Copy the form again and re-ask the AI.` };
-  if (!isLive(rec)) return { ok: false, error: `Session ${sessionId} has expired (rescanned, reloaded, or older than 30 minutes). Copy the form again.` };
+  if (!isLive(rec)) return { ok: false, error: `Session ${sessionId} has expired (recopied, reloaded, or older than 30 minutes). Copy the form again.` };
 
   let tab: chrome.tabs.Tab;
   try {
@@ -141,12 +112,14 @@ async function routeReply(text: string, fallbackSession?: string): Promise<Reply
     return { ok: false, error: "The tab with that form was closed." };
   }
 
+  let summary: FillSummary | undefined;
   try {
-    const res = await sendToTab<{ ok: boolean; error?: string }>(rec.tabId, { kind: "lb:preview", session: sessionId, values: ex.reply.values, notes });
+    const res = await sendToTab<{ ok: boolean; error?: string; summary?: FillSummary }>(rec.tabId, { kind: "lb:fill", session: sessionId, values: ex.reply.values });
     if (!res?.ok) {
       await update(sessionId, { status: "expired" });
       return { ok: false, error: res?.error ?? "The form page didn't respond." };
     }
+    summary = res.summary;
   } catch {
     await update(sessionId, { status: "expired" });
     return { ok: false, error: "The form page was reloaded or navigated away. Copy the form again." };
@@ -158,28 +131,8 @@ async function routeReply(text: string, fallbackSession?: string): Promise<Reply
     await chrome.tabs.update(rec.tabId, { active: true });
     if (tab.windowId !== undefined) await chrome.windows.update(tab.windowId, { focused: true });
   }
-  await update(sessionId, { status: "previewing" });
-  return { ok: true, session: sessionId, tabId: rec.tabId, switchedTab };
-}
-
-// ---------------------------------------------------------------------------
-// Popup
-// ---------------------------------------------------------------------------
-
-async function handlePopup(msg: PopupRequest): Promise<unknown> {
-  switch (msg.kind) {
-    case "popup:getState": {
-      const rec = await newestLive((s) => s.tabId === msg.tabId);
-      return { ok: true, session: rec };
-    }
-    case "popup:scan":
-      return scanTab(msg.tabId);
-    case "popup:markCopied":
-      await update(msg.session, { status: "awaiting_reply" });
-      return { ok: true };
-    case "popup:reply":
-      return routeReply(msg.text, msg.fallbackSession);
-  }
+  await update(sessionId, { status: "filled" });
+  return { ok: true, session: sessionId, tabId: rec.tabId, switchedTab, summary };
 }
 
 // ---------------------------------------------------------------------------
@@ -230,6 +183,17 @@ async function handleWidget(msg: WidgetRequest, tabId: number): Promise<unknown>
       const mine = await newestLive((s) => s.tabId === tabId);
       return routeReply(msg.text, mine?.id);
     }
+
+    case "w:undo": {
+      const rec = await newestLive((s) => s.status === "filled");
+      if (!rec) return { ok: false, error: "Nothing to undo." } satisfies Fail;
+      try {
+        const r = await sendToTab<{ ok: boolean; restored: number }>(rec.tabId, { kind: "lb:undo" });
+        return r?.ok ? { ok: true, restored: r.restored } : ({ ok: false, error: "Couldn't undo." } satisfies Fail);
+      } catch {
+        return { ok: false, error: "The form page was reloaded, so there's nothing to undo." } satisfies Fail;
+      }
+    }
   }
 }
 
@@ -237,7 +201,7 @@ async function handleWidget(msg: WidgetRequest, tabId: number): Promise<unknown>
 // Wiring
 // ---------------------------------------------------------------------------
 
-chrome.runtime.onMessage.addListener((msg: PopupRequest | WidgetRequest | StatusMessage, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((msg: WidgetRequest | StatusMessage, sender, sendResponse) => {
   const fail = (e: unknown) => sendResponse({ ok: false, error: e instanceof Error ? e.message : String(e) });
 
   if (msg?.kind === "lb:status") {
@@ -253,9 +217,6 @@ chrome.runtime.onMessage.addListener((msg: PopupRequest | WidgetRequest | Status
     handleWidget(msg as WidgetRequest, sender.tab.id).then(sendResponse, fail);
     return true;
   }
-  if (!msg?.kind?.startsWith("popup:") || sender.tab) return; // popup messages only from extension pages
-  handlePopup(msg as PopupRequest).then(sendResponse, fail);
-  return true;
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {

@@ -2,6 +2,8 @@
 
 Status: draft v0.1 · Scope: Phase B in detail, later phases at outline level
 
+> **Superseded in part (v0.3):** the preview overlay and the popup scan/paste flow described below were removed. The widget now floats on every page: 📋 scans and copies, ✨ fills straight away with an Undo toast, and values that fail validation are skipped and reported instead of being shown in a preview. See README.md for the current flow.
+
 ## 1. Problem
 
 People build content (LinkedIn profile text, project blurbs, job-application answers) in AI chats, then re-type or copy/paste it field by field into web forms. The AI has the knowledge but no hands. The browser has hands but no knowledge.

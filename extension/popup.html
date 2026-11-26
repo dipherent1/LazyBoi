@@ -12,34 +12,20 @@
     </header>
 
     <section>
-      <h2>1 · Scan the form</h2>
-      <button id="scan" class="primary">Scan this form</button>
-      <div id="session" hidden>
-        <div id="session-meta" class="meta"></div>
-        <details>
-          <summary>Fields found</summary>
-          <ul id="fields"></ul>
-        </details>
-        <div id="skipped" class="skipped" hidden></div>
-        <button id="copy">Copy prompt for my AI chat</button>
-      </div>
-    </section>
-
-    <section>
-      <h2>2 · Paste the AI's reply</h2>
-      <textarea id="reply" placeholder="Paste the whole reply (or just the lazyboi block). Works from any tab."></textarea>
-      <div class="row">
-        <button id="paste">Paste from clipboard</button>
-        <button id="preview" class="primary">Preview &amp; fill</button>
-      </div>
+      <p class="lead">Fill web forms with your AI chat, without copy-pasting field by field. The widget floats on every page; there's nothing to set up here.</p>
+      <ol class="howto">
+        <li><b>On the form:</b> press 📋 <b>Copy form</b>. lazyBoi scans the page and copies a prompt.</li>
+        <li><b>In your AI chat</b> (claude.ai, ChatGPT…): press <b>Paste</b>, send it, then press <b>Copy</b> on the reply.</li>
+        <li><b>Back on the form:</b> press ✨ <b>Paste into form</b>. It fills straight away, and you can <b>Undo</b>.</li>
+      </ol>
+      <p class="note">lazyBoi never submits forms or sends chat messages, and skips passwords, cards and ID fields.</p>
     </section>
 
     <section class="dock-row">
-      <label><input type="checkbox" id="show-dock" checked /> Show the lazyBoi dock on this site</label>
+      <label><input type="checkbox" id="show-dock" checked /> Show the widget on this site</label>
     </section>
 
-    <div id="status" class="status"></div>
-    <footer>Never submits forms · never touches passwords, cards or IDs</footer>
+    <footer>Drag the dots to move the widget · double-click them to tuck it away</footer>
     <script src="popup.js"></script>
   </body>
 </html>

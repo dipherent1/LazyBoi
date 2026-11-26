@@ -68,6 +68,14 @@ export interface Reply {
   values: Record<string, FieldValue>;
 }
 
+/** What happened when a reply was applied to the form. */
+export interface FillSummary {
+  filled: number;
+  /** Values lazyBoi refused or couldn't write, with a short reason. Never silently truncated. */
+  skipped: { label: string; reason: string }[];
+  unknownIds: number;
+}
+
 export type SessionStatus = "scanned" | "awaiting_reply" | "previewing" | "filled" | "expired";
 
 export interface SessionRecord {

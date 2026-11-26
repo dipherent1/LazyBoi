@@ -1,9 +1,10 @@
-// The on-page widget: a slim dock on the right edge.
-//  • form pages: emoji buttons  📋 Copy form  ·  ✨ Fill form
-//  • chat pages: word buttons   Paste (form → message box)  ·  Copy (AI reply → form)
+// The on-page widget. Always there, floating:
+//  • form pages: a dock on the right edge  📋 Copy form (scans + copies)  ·  ✨ Paste into form (fills it)
+//  • chat pages: a small bar next to the message box  Paste (form → message box)  ·  Copy (AI reply → form)
 // Every button explains itself on hover. Nothing is ever sent or submitted for you.
 import { getHiddenHosts, HIDDEN_HOSTS_KEY, setHostHidden } from "../shared/prefs";
 import { buildPrompt } from "../shared/protocol";
+import type { FillSummary } from "../shared/types";
 import type { WidgetBackend } from "./backend";
 import { findComposer, findLatestReply, insertIntoComposer } from "./chat";
 import { copyText, h } from "./dom";
@@ -12,8 +13,6 @@ import { WIDGET_HOST_ID } from "./scanner";
 export interface WidgetOptions {
   mode: "form" | "chat";
   backend: WidgetBackend;
-  /** Form mode: how many fillable fields the page has (widget stays hidden below 2). */
-  countFields?: () => number;
 }
 
 type Tone = "ok" | "warn" | "error";
@@ -45,9 +44,6 @@ const CSS = `
 .btn:disabled { opacity: .55; cursor: default; transform: none; }
 .btn.emoji { width: 44px; height: 44px; border-radius: 50%; font-size: 21px; line-height: 1; display: flex; align-items: center; justify-content: center; }
 .btn.word { min-width: 68px; padding: 9px 14px; border-radius: 999px; font-size: 12.5px; font-weight: 700; letter-spacing: .02em; }
-.badge { position: absolute; right: -4px; bottom: -4px; min-width: 19px; height: 19px; padding: 0 4px; border-radius: 10px;
-  background: #22c55e; color: #052e13; font-size: 10.5px; font-weight: 800; display: flex; align-items: center; justify-content: center;
-  border: 2px solid #1b182a; pointer-events: none; }
 .btn[data-tip]::after { content: attr(data-tip); position: absolute; right: calc(100% + 14px); top: 50%;
   transform: translateY(-50%) translateX(6px); width: max-content; max-width: 240px; text-align: left; white-space: normal;
   font: 500 12px/1.45 system-ui, sans-serif; letter-spacing: 0; padding: 9px 11px; border-radius: 11px;
@@ -56,7 +52,7 @@ const CSS = `
 .btn[data-tip]:hover::after { opacity: 1; transform: translateY(-50%); transition-delay: .25s; }
 .toast, .panel { position: absolute; right: calc(100% + 12px); top: 0; background: #12101c; color: #ececf3;
   border: 1px solid rgba(255,255,255,.12); border-radius: 14px; box-shadow: 0 12px 34px rgba(0,0,0,.42); font-size: 13px; line-height: 1.45; }
-.toast { display: flex; align-items: center; gap: 9px; padding: 10px 12px; width: max-content; max-width: 300px; }
+.toast { display: flex; align-items: center; gap: 9px; padding: 10px 12px; width: max-content; max-width: 320px; cursor: pointer; }
 .toast[hidden], .panel[hidden] { display: none; }
 .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: #22c55e; }
 .dot.warn { background: #f59e0b; } .dot.error { background: #ef4444; }
@@ -69,7 +65,7 @@ const CSS = `
 .panel textarea { width: 100%; height: 110px; resize: vertical; border: 1px solid rgba(255,255,255,.15); border-radius: 10px; padding: 8px;
   background: #1b182a; color: #ececf3; font: 12px/1.4 ui-monospace, Consolas, monospace; }
 .panel textarea:focus { outline: 2px solid #6d4dff; }
-.perr { color: #fca5a5; font-size: 12px; min-height: 0; margin-top: 6px; }
+.perr { color: #fca5a5; font-size: 12px; margin-top: 6px; }
 .prow { display: flex; gap: 8px; margin-top: 8px; }
 .mini { flex: 1; border: 1px solid rgba(255,255,255,.18); background: transparent; color: #ececf3; border-radius: 9px; padding: 7px 10px; font-size: 12.5px; cursor: pointer; }
 .mini:hover { background: rgba(255,255,255,.08); }
@@ -121,23 +117,40 @@ function friendly(e: unknown): string {
   return /context invalidated|Extension context|Receiving end does not exist/i.test(m) ? "lazyBoi was updated. Refresh this page." : m;
 }
 
-export function mountWidget(opts: WidgetOptions): { refresh(): void; destroy(): void } {
+const clip = (s: string, n = 48) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
+
+function describeFill(s: FillSummary, where = ""): { text: string; tone: Tone } {
+  if (!s.filled && !s.skipped.length) return { text: "Nothing to fill from that reply.", tone: "warn" };
+  let text = `Filled ${s.filled} field${s.filled === 1 ? "" : "s"}${where}.`;
+  if (s.skipped.length) {
+    const names = s.skipped.slice(0, 2).map((x) => `${x.label} (${clip(x.reason)})`).join("; ");
+    text += ` Skipped ${s.skipped.length}: ${names}${s.skipped.length > 2 ? "…" : ""}`;
+  }
+  return { text, tone: s.skipped.length ? "warn" : "ok" };
+}
+
+export function mountWidget(opts: WidgetOptions): { destroy(): void } {
   document.getElementById(WIDGET_HOST_ID)?.remove();
   const { backend } = opts;
+  const cleanups: (() => void)[] = [];
+  const listen = <T extends EventTarget>(t: T, type: string, fn: EventListener, capture = false) => {
+    t.addEventListener(type, fn, capture);
+    cleanups.push(() => t.removeEventListener(type, fn, capture));
+  };
+
   const host = h("div", { id: WIDGET_HOST_ID });
   const root = host.attachShadow({ mode: "open" });
   root.append(h("style", {}, CSS));
 
-  // Tucked away by default: only a thin edge shows until you hover it.
-  const dock = h("div", { class: opts.mode === "chat" ? "dock off inline" : "dock off collapsed" });
+  const dock = h("div", { class: opts.mode === "chat" ? "dock off inline" : "dock off" });
   const pill = h("div", { class: "pill" });
   const grip = h("div", { class: "grip", title: "Drag to move · double-click to tuck away" }, "⋮⋮");
+  const hideBtn = h("button", { class: "hide", type: "button", title: "Hide lazyBoi on this site", "aria-label": "Hide lazyBoi on this site" }, "×");
   const toastBox = h("div", { class: "toast", role: "status", "aria-live": "polite" });
   toastBox.hidden = true;
   const panel = h("div", { class: "panel" });
   panel.hidden = true;
   dock.append(toastBox, panel, pill);
-  const hideBtn = h("button", { class: "hide", type: "button", title: "Hide lazyBoi on this site", "aria-label": "Hide lazyBoi on this site" }, "×");
   pill.append(h("div", { class: "top" }, grip, hideBtn));
   root.append(dock);
 
@@ -171,7 +184,23 @@ export function mountWidget(opts: WidgetOptions): { refresh(): void; destroy(): 
     toastBox.hidden = false;
     dock.classList.add("peek");
     window.clearTimeout(toastTimer);
-    toastTimer = window.setTimeout(hideToast, action ? 7000 : 3500);
+    toastTimer = window.setTimeout(hideToast, action ? 8000 : 3500);
+  }
+  cleanups.push(() => window.clearTimeout(toastTimer));
+
+  /** Report a fill, with Undo. Used after any fill that touched this page's form (or the form tab, from chat). */
+  function reportFill(s: FillSummary, where = "") {
+    const { text, tone } = describeFill(s, where);
+    const undo = s.filled
+      ? {
+          label: "Undo",
+          run: async () => {
+            const u = await backend.undo();
+            toast(u.ok ? `Restored ${u.restored} field${u.restored === 1 ? "" : "s"}.` : u.error, u.ok ? "ok" : "error");
+          },
+        }
+      : undefined;
+    toast(text, tone, undo);
   }
 
   function guard(b: HTMLButtonElement, fn: () => Promise<void>) {
@@ -188,14 +217,13 @@ export function mountWidget(opts: WidgetOptions): { refresh(): void; destroy(): 
     });
   }
 
-  // ---- paste panel (form mode fallback when no reply is waiting) ----
+  // ---- paste panel (form mode: when no reply is waiting) ----
   const ta = h("textarea", { placeholder: "Paste the AI's reply here (the whole message is fine)", "aria-label": "AI reply" });
   const perr = h("div", { class: "perr" });
   const pasteClip = h("button", { class: "mini", type: "button" }, "Paste clipboard");
-  const go = h("button", { class: "mini primary", type: "button" }, "Preview & fill");
+  const go = h("button", { class: "mini primary", type: "button" }, "Fill form");
   const closeX = h("button", { class: "pclose", type: "button", title: "Close (Esc)", "aria-label": "Close" }, "×");
   panel.append(h("div", { class: "ptitle" }, "Paste the AI's reply", closeX), ta, perr, h("div", { class: "prow" }, pasteClip, go));
-  closeX.addEventListener("click", () => closePanel());
 
   function openPanel(message = "") {
     hideToast();
@@ -211,6 +239,7 @@ export function mountWidget(opts: WidgetOptions): { refresh(): void; destroy(): 
     perr.textContent = "";
     if (toastBox.hidden) dock.classList.remove("peek");
   }
+  closeX.addEventListener("click", () => closePanel());
   pasteClip.addEventListener("click", async () => {
     try {
       ta.value = await navigator.clipboard.readText();
@@ -228,7 +257,7 @@ export function mountWidget(opts: WidgetOptions): { refresh(): void; destroy(): 
     go.disabled = true;
     try {
       const r = await backend.submitReply(ta.value);
-      if (r.ok) closePanel();
+      if (r.ok) closePanel(); // the fill itself is reported by the "lazyboi-filled" event
       else perr.textContent = r.error;
     } catch (e) {
       perr.textContent = friendly(e);
@@ -243,29 +272,17 @@ export function mountWidget(opts: WidgetOptions): { refresh(): void; destroy(): 
   panel.addEventListener("keyup", (e) => e.stopPropagation());
   panel.addEventListener("keypress", (e) => e.stopPropagation());
   // Click anywhere else, or press Esc, and the paste box goes away.
-  document.addEventListener(
-    "pointerdown",
-    (e) => {
-      if (!panel.hidden && !e.composedPath().includes(host)) closePanel();
-    },
-    true,
-  );
-  document.addEventListener(
-    "keydown",
-    (e) => {
-      if (e.key === "Escape" && !panel.hidden) closePanel();
-    },
-    true,
-  );
+  listen(document, "pointerdown", ((e: PointerEvent) => {
+    if (!panel.hidden && !e.composedPath().includes(host)) closePanel();
+  }) as EventListener, true);
+  listen(document, "keydown", ((e: KeyboardEvent) => {
+    if (e.key === "Escape" && !panel.hidden) closePanel();
+  }) as EventListener, true);
 
   // ---- buttons ----
-  let badge: HTMLElement | null = null;
-
   if (opts.mode === "form") {
-    const copyBtn = button("emoji", "📋", "Copy form", "Copy form: reads this page's fields and copies a prompt for your AI chat.");
-    const fillBtn = button("emoji", "✨", "Fill form", "Fill form: shows the AI's reply as a preview and fills this form. You still press Submit.");
-    badge = h("span", { class: "badge" }, "0");
-    copyBtn.append(badge);
+    const copyBtn = button("emoji", "📋", "Copy form", "Copy form: scans this page and copies a prompt for your AI chat.");
+    const fillBtn = button("emoji", "✨", "Paste into form", "Paste into form: fills this form from the AI's reply. You can undo, and you press Submit yourself.");
     pill.append(copyBtn, fillBtn);
 
     guard(copyBtn, async () => {
@@ -273,17 +290,21 @@ export function mountWidget(opts: WidgetOptions): { refresh(): void; destroy(): 
       if (!r.ok) return toast(r.error, "error");
       const n = r.schema.fields.length;
       if (!n) return toast("No fillable fields found on this page.", "error");
-      if (!(await copyText(buildPrompt(r.schema)))) return toast("Couldn't copy to the clipboard.", "error");
-      await backend.markCopied(r.schema.session);
-      toast(`Copied ${n} field${n === 1 ? "" : "s"}. Press Paste in your AI chat.`);
+      const copied = await copyText(buildPrompt(r.schema));
+      await backend.markCopied(r.schema.session); // the chat's Paste button uses this, not the clipboard
+      if (!copied) return toast(`Scanned ${n} field${n === 1 ? "" : "s"}, but the browser blocked the clipboard. Open your AI chat and press Paste anyway.`, "warn");
+      toast(`Copied ${n} field${n === 1 ? "" : "s"}. Open your AI chat and press Paste.`);
     });
 
     guard(fillBtn, async () => {
       const r = await backend.fillFromPending();
-      if (r.ok) return;
+      if (r.ok) return; // reported by the "lazyboi-filled" event
       if (r.code === "no_session") return toast(r.error, "error");
       openPanel(); // nothing waiting: let the user paste a reply
     });
+
+    // Any fill on this page (from here or from the chat tab) is reported with Undo.
+    listen(document, "lazyboi-filled", ((e: CustomEvent<FillSummary>) => reportFill(e.detail)) as EventListener);
   } else {
     const pasteBtn = button("word", "Paste", "Paste form", "Paste: puts the form you copied into this chat's message box. You press Send.");
     const copyBtn = button("word", "Copy", "Copy reply", "Copy: copies the AI's lazyBoi reply so your form can fill from it.");
@@ -310,7 +331,9 @@ export function mountWidget(opts: WidgetOptions): { refresh(): void; destroy(): 
         label: "Fill now",
         run: async () => {
           const r = await backend.submitReply(clean);
-          toast(r.ok ? "Preview opened on the form tab." : r.error, r.ok ? "ok" : "error");
+          if (!r.ok) return toast(r.error, "error");
+          if (r.summary) reportFill(r.summary, " on the form tab");
+          else toast("Sent to the form tab.");
         },
       });
     });
@@ -344,27 +367,29 @@ export function mountWidget(opts: WidgetOptions): { refresh(): void; destroy(): 
 
   void loadPrefs().then((p) => {
     if (opts.mode === "form" && typeof p.top === "number") dock.style.top = `${clampTop(p.top)}px`;
-    if (p.collapsed === false) dock.classList.remove("collapsed"); // only open if the user left it open
+    if (opts.mode === "form" && p.collapsed) dock.classList.add("collapsed");
   });
 
-  // ---- visibility ----
-  let tooFew = opts.mode === "form";
-  let overlayOpen = false;
-  let hiddenHere = false;
+  // ---- per-site hide (the toolbar popup has the switch to bring it back) ----
   const hostName = location.hostname;
-  const applyVisibility = () => dock.classList.toggle("off", tooFew || overlayOpen || hiddenHere);
+  let hiddenHere = true; // stay hidden until we know the site isn't switched off
+  const applyVisibility = () => dock.classList.toggle("off", hiddenHere);
   void getHiddenHosts().then((list) => {
     hiddenHere = list.includes(hostName);
     applyVisibility();
+    schedulePlace();
   });
   if (typeof chrome !== "undefined" && chrome.storage?.onChanged) {
-    chrome.storage.onChanged.addListener((changes, area) => {
+    const onChanged = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
       const c = changes[HIDDEN_HOSTS_KEY];
       if (area === "local" && c) {
         hiddenHere = ((c.newValue as string[] | undefined) ?? []).includes(hostName);
         applyVisibility();
+        schedulePlace();
       }
-    });
+    };
+    chrome.storage.onChanged.addListener(onChanged);
+    cleanups.push(() => chrome.storage.onChanged.removeListener(onChanged));
   }
   const onHide = () => {
     toast("Hidden on this site. Turn it back on from the lazyBoi toolbar icon.");
@@ -373,38 +398,11 @@ export function mountWidget(opts: WidgetOptions): { refresh(): void; destroy(): 
         hiddenHere = true;
         applyVisibility();
       });
-    }, 2600);
+    }, 2400);
   };
   dock.querySelectorAll(".hide").forEach((b) => b.addEventListener("click", onHide));
-  document.addEventListener("lazyboi-overlay", ((e: CustomEvent<{ open: boolean }>) => {
-    overlayOpen = e.detail.open;
-    applyVisibility();
-  }) as EventListener);
 
-  function refresh() {
-    if (opts.mode !== "form" || !opts.countFields) return;
-    const n = opts.countFields();
-    if (badge) badge.textContent = n > 99 ? "99+" : String(n);
-    tooFew = n < 2;
-    applyVisibility();
-  }
-
-  let timer = 0;
-  const schedule = () => {
-    window.clearTimeout(timer);
-    timer = window.setTimeout(refresh, 700);
-  };
-  const observer = new MutationObserver(schedule);
-  if (opts.mode === "form") {
-    observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden", "style", "class", "disabled"] });
-  }
-  applyVisibility();
-  refresh();
-
-  document.documentElement.append(host);
-
-  // Chat mode: sit just above the message box, right-aligned, and follow it as it moves or grows.
-  let placeTimer = 0;
+  // ---- chat mode: sit just above the message box, right-aligned, and follow it ----
   let raf = 0;
   const place = () => {
     if (opts.mode !== "chat" || dock.classList.contains("off")) return;
@@ -425,27 +423,25 @@ export function mountWidget(opts: WidgetOptions): { refresh(): void; destroy(): 
     dock.style.left = `${Math.max(8, Math.min(left, window.innerWidth - w - 8))}px`;
     dock.style.top = `${Math.max(8, Math.min(top, window.innerHeight - hgt - 8))}px`;
   };
+  function schedulePlace() {
+    if (opts.mode !== "chat" || raf) return;
+    raf = requestAnimationFrame(() => {
+      raf = 0;
+      place();
+    });
+  }
   if (opts.mode === "chat") {
-    const schedule = () => {
-      if (raf) return;
-      raf = requestAnimationFrame(() => {
-        raf = 0;
-        place();
-      });
-    };
-    window.addEventListener("resize", schedule);
-    window.addEventListener("scroll", schedule, true);
-    document.addEventListener("input", schedule, true);
-    placeTimer = window.setInterval(place, 700);
-    place();
-    void getHiddenHosts().then(schedule);
+    listen(window, "resize", schedulePlace);
+    listen(window, "scroll", schedulePlace, true);
+    listen(document, "input", schedulePlace, true);
+    const t = window.setInterval(place, 700);
+    cleanups.push(() => window.clearInterval(t));
   }
 
+  document.documentElement.append(host);
   return {
-    refresh,
     destroy() {
-      observer.disconnect();
-      window.clearInterval(placeTimer);
+      cleanups.forEach((fn) => fn());
       host.remove();
     },
   };

@@ -15,4 +15,5 @@ export const chromeBackend: WidgetBackend = {
   submitReply: (text) => send({ kind: "w:reply", text }),
   latestForm: () => send({ kind: "w:latest" }),
   queueReply: (text) => send({ kind: "w:queue", text }),
+  undo: () => send({ kind: "w:undo" }),
 };

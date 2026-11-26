@@ -1,5 +1,5 @@
-// Content script entry: runs on every page. It answers scan/preview requests from the service worker
-// and shows the on-page widget (form pages: when there are fields; chat pages: always).
+// Content script entry: runs on every page. It shows the floating widget, and answers scan / fill / undo
+// requests from the service worker.
 import type { ContentRequest, StatusMessage } from "../shared/messages";
 import { chromeBackend } from "./backend-chrome";
 import { isChatHost } from "./chat";
@@ -14,8 +14,8 @@ declare global {
 
 const controller = new FormController();
 
-function sendStatus(session: string, status: StatusMessage["status"]) {
-  const msg: StatusMessage = { kind: "lb:status", session, status };
+function sendStatus(session: string) {
+  const msg: StatusMessage = { kind: "lb:status", session, status: "filled" };
   chrome.runtime.sendMessage(msg).catch(() => {});
 }
 
@@ -25,8 +25,13 @@ function handle(msg: ContentRequest): unknown {
       return { ok: true };
     case "lb:scan":
       return { ok: true, schema: controller.scan(msg.session) };
-    case "lb:preview":
-      return controller.preview(msg.session, msg.values, msg.notes, (s) => sendStatus(msg.session, s));
+    case "lb:fill": {
+      const r = controller.apply(msg.session, msg.values);
+      if (r.ok) sendStatus(msg.session);
+      return r;
+    }
+    case "lb:undo":
+      return { ok: true, restored: controller.undo() };
   }
 }
 
@@ -42,12 +47,7 @@ if (!window.__lazyBoiContent) {
   });
 
   if (window.top === window) {
-    const start = () =>
-      mountWidget({
-        mode: isChatHost(location.hostname) ? "chat" : "form",
-        backend: chromeBackend,
-        countFields: () => controller.peek(),
-      });
+    const start = () => mountWidget({ mode: isChatHost(location.hostname) ? "chat" : "form", backend: chromeBackend });
     if (document.body) start();
     else document.addEventListener("DOMContentLoaded", start, { once: true });
   }

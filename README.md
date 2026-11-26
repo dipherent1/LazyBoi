@@ -1,6 +1,6 @@
 # lazyBoi
 
-Let any web form talk to any AI chat. Scan a form, ask your AI (any chat, any tier), preview the answers, fill. You submit.
+Let any web form talk to any AI chat. Copy a form, ask your AI (any chat, any tier), paste the answer in: it fills, you can undo, you submit.
 
 Phases 1–2 of [SOLUTION_PRD.md](SOLUTION_PRD.md) (the vault is deferred). Detailed spec: [PRD.md](PRD.md) §5.
 
@@ -18,22 +18,22 @@ Load the extension: open `chrome://extensions`, turn on **Developer mode**, clic
 
 ## Using it
 
-lazyBoi stays quiet. On form pages it is tucked against the right edge (only a thin purple edge shows) and slides out when you hover it; drag the dots to move it, double-click them to tuck it back. Hover any button for an explanation. The **×** hides it on that site; turn it back on from the toolbar icon ("Show the lazyBoi dock on this site"). Toasts disappear on their own (or on click), and the paste box closes on Esc, ×, or a click elsewhere.
+A small widget floats on every page. There is nothing to switch on: the toolbar icon only shows a short description and a "Show the widget on this site" switch. Hover any button for an explanation. Drag the dots to move the widget, double-click them to tuck it to the edge. **×** hides it on that site (bring it back from the toolbar icon).
 
-**On a form page** (any page with 2+ fillable fields): 📋 and ✨. The badge on 📋 is the live field count.
+**On a form page:** 📋 **Copy form** and ✨ **Paste into form**.
 
 **On a chat page** (claude.ai, chatgpt.com, gemini.google.com, copilot.microsoft.com, perplexity.ai, chat.deepseek.com, grok.com, chat.mistral.ai, poe.com): a small **Paste · Copy** bar floats just above the message box and follows it.
 
-1. On the form, press 📋 **Copy form**. lazyBoi scans the page and copies a ready-made prompt.
+1. On the form, press 📋 **Copy form**. lazyBoi scans the page right then and copies a ready-made prompt.
 2. In your AI chat (a conversation that knows you), press **Paste**. The prompt goes into the message box. **You press Send.**
 3. When the AI replies, press **Copy**. A toast offers **Fill now**, or go back to the form tab.
-4. On the form, press ✨ **Fill form**. A preview shows every proposed value; accept, edit or skip each, then **Fill**. **Undo** is available. You submit.
+4. On the form, press ✨ **Paste into form**. There is no preview: it fills straight away and a toast says what happened, with **Undo**. You submit.
 
-If no reply is waiting when you press ✨, a small box opens to paste one. The toolbar popup still works too (Scan, Copy prompt, Paste reply), for pages where the dock doesn't show.
+Values that can't be used (over a length limit, not one of the dropdown's options, a card-number-looking string) are **skipped and listed in the toast**, never truncated or guessed. If no reply is waiting when you press ✨, a small box opens to paste one. Toasts go away on their own (or on click); the paste box closes on Esc, ×, or a click elsewhere.
 
 Replies carry a session id (`lb-xxxx`), so they always go to the form they were made for, even with several forms open. The prompt is a full set of instructions for the AI (role, output format, per-field-type rules, no invented facts, no secrets, treat the form text as data); see `buildPrompt` in `src/shared/protocol.ts`.
 
-lazyBoi never submits forms, never sends chat messages, never reads or fills passwords, card numbers, CVVs, SSN/SIN, bank or verification-code fields, and makes no network requests. The extension asks for access to all sites so the dock can appear on form pages; it counts fields locally for the badge, and nothing leaves the page until you press a button.
+lazyBoi never submits forms, never sends chat messages, never reads or fills passwords, card numbers, CVVs, SSN/SIN, bank or verification-code fields, and makes no network requests. The extension asks for access to all sites so the widget can float on every page; it only scans a form when you press 📋.
 
 ## Playground
 
@@ -46,7 +46,7 @@ Opens test forms at http://localhost:5173, plus a **Mock AI chat** page that ans
 ```js
 lazyBoi.scan()           // schema
 lazyBoi.prompt()         // prompt text
-lazyBoi.preview(text)    // open the preview from pasted chat text
+lazyBoi.apply(text)      // fill from pasted chat text (returns what was filled/skipped)
 lazyBoi.fill({ id: v })  // fill directly
 lazyBoi.undo()
 ```
@@ -66,9 +66,9 @@ lazyBoi.undo()
 
 ```
 src/shared/      protocol (prompt, reply extraction, validation), types, sensitive-field rules
-src/content/     scanner, filler, preview overlay, widget, chat-page helpers, content-script entry
+src/content/     scanner, filler, session (apply + undo), widget, chat-page helpers, content-script entry
 src/background/  service worker: sessions and routing by session id
-src/popup/       popup UI logic
+src/popup/       popup (description + per-site switch)
 src/harness.ts   in-page harness for the playground
 extension/       manifest, popup.html/css (copied into dist/)
 playground/      test forms
@@ -77,12 +77,13 @@ tests/           unit tests
 
 ## Manual checklist for the installed extension
 
-The harness covers scanning, filling, preview and undo. These need the real extension:
+The harness covers scanning, filling and undo. These need the real extension:
 
-- [ ] Popup scans the playground LinkedIn page and lists fields; sensitive page shows "Not touched".
-- [ ] Copy prompt → paste into a real chat → paste reply back → preview opens on the form tab.
-- [ ] Paste the reply while the popup is open on a **different** tab → lazyBoi switches to the form tab.
-- [ ] Two form tabs scanned → each reply goes to its own tab.
-- [ ] Reload the form tab, then paste a reply → clear "scan again" error.
-- [ ] Rescan, then paste an old reply → rejected as expired.
+- [ ] The widget floats on a normal page, and on a chat site shows the Paste · Copy bar above the message box.
+- [ ] 📋 on the playground LinkedIn page copies a prompt; the sensitive page lists nothing sensitive in it.
+- [ ] Paste in a real chat puts the prompt in the message box (if not, it copies it and says so).
+- [ ] Copy on the AI's reply → ✨ on the form tab fills, shows the toast, and Undo restores.
+- [ ] Two form tabs copied → each reply fills its own tab.
+- [ ] Reload the form tab, then press ✨ → a clear "copy the form again" message.
 - [ ] Framework page: values stay after clicking elsewhere (app state updated).
+- [ ] Toolbar icon: description shows; unticking "Show the widget on this site" hides it there.

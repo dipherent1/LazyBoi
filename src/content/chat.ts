@@ -2,7 +2,7 @@
 import { extractReply } from "../shared/protocol";
 import type { Reply } from "../shared/types";
 import { fire, setNative } from "./filler";
-import { OVERLAY_HOST_ID, WIDGET_HOST_ID } from "./scanner";
+import { WIDGET_HOST_ID } from "./scanner";
 
 export const CHAT_HOSTS = [
   "claude.ai",
@@ -24,7 +24,7 @@ export function isChatHost(host: string): boolean {
 const CANDIDATES = "textarea, [contenteditable]:not([contenteditable='false'])";
 
 function usable(el: HTMLElement): boolean {
-  if (el.closest(`#${OVERLAY_HOST_ID}, #${WIDGET_HOST_ID}`)) return false;
+  if (el.closest(`#${WIDGET_HOST_ID}`)) return false;
   const c = el as HTMLTextAreaElement;
   if (c.readOnly || c.disabled) return false;
   const r = el.getBoundingClientRect();
