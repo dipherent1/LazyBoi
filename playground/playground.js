@@ -11,6 +11,7 @@
     ["job.html", "Job application"],
     ["framework.html", "Framework inputs"],
     ["dynamic.html", "Dynamic / multi-step"],
+    ["modal.html", "Modal in shadow DOM"],
     ["richtext.html", "Rich text"],
     ["frames.html", "Iframe + shadow DOM"],
     ["sensitive.html", "Sensitive"],

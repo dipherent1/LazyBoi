@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Profile (modal in shadow DOM) · lazyBoi playground</title>
+    <link rel="stylesheet" href="playground.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Profile with an "Add a role" modal</h1>
+      <p class="lead">
+        Like LinkedIn: the page already has a search box and a message box, and the form is a modal that opens
+        later, rendered inside an open shadow root. Choosing "On-site" reveals one more field, and unticking
+        "I currently work here" reveals the end date.
+      </p>
+      <div class="f"><input type="search" aria-label="Search" placeholder="Search" /></div>
+      <div class="f"><div contenteditable="true" role="textbox" aria-label="Write a message" data-placeholder="Write a message…" style="border:1px solid #c8c8d2;border-radius:7px;padding:8px;min-height:40px"></div></div>
+      <button id="open" type="button" class="submit">Add experience</button>
+    </main>
+
+    <script>
+      const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+      const monthOpts = '<option value="">Month</option>' + MONTHS.map((m, i) => `<option value="${i + 1}">${m}</option>`).join("");
+      const yearOpts = '<option value="">Year</option>' + Array.from({length: 12}, (_, i) => 2026 - i).map((y) => `<option>${y}</option>`).join("");
+
+      function openModal() {
+        if (document.getElementById("interop-outlet")) return;
+        // Open after a short delay, like a real app fetching the dialog.
+        setTimeout(() => {
+          const host = document.createElement("div");
+          host.id = "interop-outlet";
+          const root = host.attachShadow({ mode: "open" });
+          root.innerHTML = `
+            <style>
+              .backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:50;display:flex;align-items:flex-start;justify-content:center;padding-top:40px;overflow:auto}
+              .modal{background:#fff;border-radius:10px;width:min(620px,92vw);padding:18px 22px;font:14px system-ui;box-shadow:0 10px 40px rgba(0,0,0,.3)}
+              h2{margin:0 0 12px;font-size:20px} label{display:block;font-weight:500;margin:10px 0 4px}
+              input[type=text],select{width:100%;padding:8px;border:1px solid #999;border-radius:5px;font:inherit}
+              .row{display:grid;grid-template-columns:1fr 1fr;gap:12px} .actions{display:flex;justify-content:space-between;margin-top:16px}
+              button{font:inherit;padding:7px 16px;border-radius:999px;border:1px solid #0a66c2;background:#fff;color:#0a66c2;cursor:pointer}
+              button.save{background:#0a66c2;color:#fff;font-weight:600}
+              .notify{background:#eef3f8;border-radius:6px;padding:10px 12px;margin-bottom:6px}
+            </style>
+            <div class="backdrop" role="dialog" aria-label="Add a role to your profile">
+              <form class="modal">
+                <h2>Add a role to your profile</h2>
+                <div class="notify"><b>Notify network</b>
+                  <label style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" name="notify" /> Notify your network of key profile changes and work anniversaries.</label>
+                </div>
+                <div class="row">
+                  <div><label for="title">Job title*</label><input id="title" name="title" type="text" placeholder="Example: Senior Product Manager" /></div>
+                  <div><label for="org">Organization*</label><input id="org" name="org" type="text" placeholder="Example: Microsoft" /></div>
+                </div>
+                <div class="row">
+                  <div><label for="loc">Location</label><input id="loc" name="loc" type="text" placeholder="City or region" /></div>
+                  <div><label for="ltype">Location type</label>
+                    <select id="ltype" name="ltype"><option value="">Please select</option><option value="onsite">On-site</option><option value="hybrid">Hybrid</option><option value="remote">Remote</option></select></div>
+                </div>
+                <div id="office-wrap" hidden><label for="office">Office address</label><input id="office" name="office" type="text" /></div>
+                <div class="row">
+                  <div><label for="etype">Employment type</label>
+                    <select id="etype" name="etype"><option value="">Please select</option><option value="ft">Full-time</option><option value="pt">Part-time</option><option value="contract">Contract</option><option value="intern">Internship</option></select></div>
+                  <div><label for="source">Where did you find this job</label>
+                    <select id="source" name="source"><option value="">Please select</option><option value="linkedin">LinkedIn</option><option value="referral">Referral</option><option value="other">Other</option></select></div>
+                </div>
+                <label style="display:flex;gap:8px;align-items:center;font-weight:400;margin-top:14px"><input id="current" name="current" type="checkbox" checked /> I currently work here</label>
+                <div class="row">
+                  <div><label for="sm">Start month</label><select id="sm" name="sm">${monthOpts}</select></div>
+                  <div><label for="sy">Start year*</label><select id="sy" name="sy">${yearOpts}</select></div>
+                </div>
+                <div id="end-wrap" class="row" hidden>
+                  <div><label for="em">End month</label><select id="em" name="em">${monthOpts}</select></div>
+                  <div><label for="ey">End year</label><select id="ey" name="ey">${yearOpts}</select></div>
+                </div>
+                <div class="actions"><button type="button" id="close">Cancel</button><button class="save" type="submit">Save</button></div>
+              </form>
+            </div>`;
+          document.body.append(host);
+          const $ = (id) => root.getElementById(id);
+          $("ltype").addEventListener("change", () => ($("office-wrap").hidden = $("ltype").value !== "onsite"));
+          $("current").addEventListener("change", () => ($("end-wrap").hidden = $("current").checked));
+          $("close").addEventListener("click", () => host.remove());
+          root.querySelector("form").addEventListener("submit", (e) => { e.preventDefault(); window.__modalSubmits = (window.__modalSubmits || 0) + 1; });
+        }, 1500);
+      }
+      document.getElementById("open").addEventListener("click", openModal);
+    </script>
+    <script src="playground.js"></script>
+  </body>
+</html>

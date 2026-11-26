@@ -60,7 +60,7 @@
         if (!session || !arr) return { text: "I only understand lazyBoi form requests in this demo." };
         const fields = JSON.parse(arr[1].replace(/\n\s*/g, ""));
         const values = {};
-        fields.forEach((f, i) => { if (i % 7 !== 6) values[f.id] = sample(f); }); // leave every 7th field out
+        fields.forEach((f, i) => { if (i % 7 !== 6 || f.type !== "text") values[f.id] = sample(f); }); // leave every 7th text field out
         const skipped = fields.filter((f) => !(f.id in values)).map((f) => f.label);
         return { json: JSON.stringify({ session, values }), skipped };
       }

@@ -165,3 +165,38 @@ describe("filler", () => {
     expect(fill([{ binding: b, value: "x" }]).results[0]!.status).toBe("not_found");
   });
 });
+
+describe("scanner: modal dialogs", () => {
+  const labels = (r: ReturnType<typeof scanPage>) => r.schema.fields.map((f) => f.label);
+
+  it("scans only the dialog when a modal is open", () => {
+    const r = page(`
+      <input aria-label="Search"><div contenteditable="true" aria-label="Write a message"></div>
+      <div role="dialog" aria-modal="true">
+        <label for="t">Job title</label><input id="t"><label for="o">Organization</label><input id="o">
+      </div>`);
+    expect(labels(r)).toEqual(["Job title", "Organization"]);
+  });
+
+  it("finds a modal that lives inside an open shadow root, like LinkedIn's", () => {
+    document.body.innerHTML = `<input aria-label="Search"><div id="outlet"></div>`;
+    const root = document.getElementById("outlet")!.attachShadow({ mode: "open" });
+    root.innerHTML = `<div role="dialog"><label for="t">Job title</label><input id="t"><label for="o">Organization</label><input id="o"></div>`;
+    expect(labels(scanPage("lb-t"))).toEqual(["Job title", "Organization"]);
+  });
+
+  it("scans the whole page when there is no dialog, or the dialog is hidden", () => {
+    expect(labels(page(`<input aria-label="A"><input aria-label="B">`))).toEqual(["A", "B"]);
+    expect(labels(page(`<input aria-label="A"><div role="dialog" aria-modal="true" hidden><input aria-label="X"></div>`))).toEqual(["A"]);
+  });
+
+  it("doesn't let a one-box popup (like a small chat window) take over the page", () => {
+    const r = page(`<input aria-label="First"><input aria-label="Second"><div role="dialog"><div contenteditable="true" aria-label="Message"></div></div>`);
+    expect(labels(r)).toEqual(["First", "Second", "Message"]);
+  });
+
+  it("uses the latest dialog when several are open", () => {
+    const r = page(`<div role="dialog" aria-modal="true"><input aria-label="Old"></div><div role="dialog" aria-modal="true"><input aria-label="New"></div>`);
+    expect(labels(r)).toEqual(["New"]);
+  });
+});

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "lazyBoi",
-  "version": "0.2.0",
-  "description": "Let any web form talk to any AI chat: copy a form, ask your AI, preview and fill.",
+  "version": "0.3.0",
+  "description": "Let any web form talk to any AI chat: one button fills a form from your AI chat, with undo.",
   "action": {
     "default_title": "lazyBoi",
     "default_popup": "popup.html"
@@ -17,5 +17,6 @@
       "run_at": "document_idle"
     }
   ],
+  "host_permissions": ["<all_urls>"],
   "permissions": ["activeTab", "scripting", "storage", "clipboardWrite", "clipboardRead"]
 }

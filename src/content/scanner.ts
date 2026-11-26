@@ -337,9 +337,45 @@ function choiceRendered(el: HTMLInputElement): boolean {
   return !!lab && isRendered(lab as HTMLElement);
 }
 
+// ---------------------------------------------------------------------------
+// Modal dialogs: when one is open, the form is the dialog, not the page behind it
+// ---------------------------------------------------------------------------
+
+const CONTROLS = "input:not([type='hidden']), select, textarea, [contenteditable]:not([contenteditable='false'])";
+
+/** True if `el` is `ancestor` or inside it, looking through shadow roots. */
+function within(el: Node, ancestor: Node): boolean {
+  for (let n: Node | null = el; n; n = n.parentNode ?? (n as ShadowRoot).host ?? null) if (n === ancestor) return true;
+  return false;
+}
+
+function isStrongModal(el: HTMLElement): boolean {
+  if (el.getAttribute("aria-modal") === "true") return true;
+  try {
+    return el.matches("dialog:modal");
+  } catch {
+    return false; // older engines without :modal
+  }
+}
+
+/**
+ * The dialog the user is looking at, if any: a real modal (aria-modal / showModal) with a field in it, or a
+ * role=dialog with at least two fields (so a one-box chat popup on the page doesn't take over). Latest wins.
+ */
+function findActiveModal(all: HTMLElement[]): HTMLElement | null {
+  const dialogs = all.filter((el) => el.matches("dialog[open], [role='dialog'], [role='alertdialog'], [aria-modal='true']") && isRendered(el));
+  const count = (el: HTMLElement) => el.querySelectorAll(CONTROLS).length;
+  const strong = dialogs.filter((d) => isStrongModal(d) && count(d) >= 1);
+  if (strong.length) return strong[strong.length - 1]!;
+  const weak = dialogs.filter((d) => count(d) >= 2);
+  return weak.length ? weak[weak.length - 1]! : null;
+}
+
 export function scanPage(session: string, doc: Document = document): ScanResult {
-  const all: HTMLElement[] = [];
+  let all: HTMLElement[] = [];
   collect(doc, all);
+  const modal = findActiveModal(all);
+  if (modal) all = all.filter((el) => within(el, modal));
 
   const fields: Field[] = [];
   const skipped: SkippedField[] = [];

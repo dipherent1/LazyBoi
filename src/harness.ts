@@ -66,6 +66,7 @@ declare global {
 window.lazyBoi = api;
 
 const chatMode = location.pathname.endsWith("/chat.html");
-const start = () => mountWidget({ mode: chatMode ? "chat" : "form", backend: createLocalBackend(controller) });
+const start = () =>
+  mountWidget({ mode: chatMode ? "chat" : "form", backend: createLocalBackend(controller), countFields: () => controller.peek() });
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start, { once: true });
 else start();

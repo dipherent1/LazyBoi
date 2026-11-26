@@ -74,6 +74,27 @@ export function buildPrompt(schema: FormSchema): string {
   ].join("\n");
 }
 
+/** A short follow-up for fields that appeared after the first answer (same session, same chat). */
+export function buildFollowUpPrompt(schema: FormSchema): string {
+  const s = schema.session;
+  const fieldsJson = schema.fields.map((f) => "  " + JSON.stringify(compactField(f))).join(",\n");
+  return [
+    "[lazyBoi form-fill request: more fields]",
+    "",
+    `The same form (session ${s}) now shows more fields, revealed by your earlier answers. Answer only these, with the same rules as before: one \`lazyboi\` code block, the same session id, each field's "id" as the key, only facts you actually know about me, and leave out anything you don't know.`,
+    "```lazyboi",
+    `{"session":"${s}","values":{"FIELD_ID_1":"a string","FIELD_ID_2":true}}`,
+    "```",
+    "",
+    `Page: ${schema.page.title || "(untitled)"} (${schema.page.url})`,
+    `Session: ${s}`,
+    "Fields (JSON):",
+    "[",
+    fieldsJson,
+    "]",
+  ].join("\n");
+}
+
 // ---------------------------------------------------------------------------
 // Reply extraction
 // ---------------------------------------------------------------------------

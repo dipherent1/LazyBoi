@@ -9,21 +9,25 @@ export type WidgetRequest =
   | { kind: "w:reply"; text: string }
   | { kind: "w:latest" }
   | { kind: "w:queue"; text: string }
-  | { kind: "w:undo" };
+  | { kind: "w:undo" }
+  | { kind: "w:chatTabs" }
+  | { kind: "w:ask"; tabId: number; session: string };
 
 /** To a tab's content script. */
 export type ContentRequest =
   | { kind: "lb:ping" }
   | { kind: "lb:scan"; session: string }
-  | { kind: "lb:fill"; session: string; values: Record<string, FieldValue> }
-  | { kind: "lb:undo" };
+  | { kind: "lb:fill"; session: string; values: Record<string, FieldValue>; append?: boolean }
+  | { kind: "lb:rescan" }
+  | { kind: "lb:undo" }
+  | { kind: "lb:ask"; schema: FormSchema; followUp?: boolean };
 
 export type StatusMessage = { kind: "lb:status"; session: string; status: "filled" };
 
 export type Ok<T = object> = { ok: true } & T;
-export type Fail = { ok: false; error: string; code?: string };
+export type Fail = { ok: false; error: string; code?: string; debug?: unknown };
 export type Result<T = object> = Ok<T> | Fail;
 
 export type ScanResponse = Result<{ session: SessionRecord }>;
-export type ReplyResponse = Result<{ session: string; tabId: number; switchedTab: boolean; summary?: FillSummary }>;
+export type ReplyResponse = Result<{ session: string; tabId: number; switchedTab: boolean; summary?: FillSummary; rounds?: number; note?: string }>;
 export type ContentScanResponse = Result<{ schema: FormSchema }>;

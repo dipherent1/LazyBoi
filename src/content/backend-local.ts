@@ -1,8 +1,10 @@
 // Playground-only backend: state lives in localStorage and tabs talk over a BroadcastChannel,
 // so the form page and the mock chat page can run the whole loop without the extension installed.
 import { extractReply } from "../shared/protocol";
+import { runRounds, type RoundPorts } from "../shared/rounds";
 import type { FieldValue, FormSchema } from "../shared/types";
-import type { Res, WidgetBackend } from "./backend";
+import { askChat } from "./ask";
+import type { ChatTab, Res, WidgetBackend } from "./backend";
 import type { FormController } from "./session";
 
 const KEY = "lazyboi.h.store";
@@ -30,10 +32,39 @@ const write = (s: Store) => localStorage.setItem(KEY, JSON.stringify(s));
 export function createLocalBackend(controller: FormController): WidgetBackend {
   const pageId = Math.random().toString(36).slice(2);
   const channel = new BroadcastChannel("lazyboi-h");
+  const isChat = location.pathname.endsWith("/chat.html");
+  const chatId = Math.floor(Math.random() * 1e9);
+  const heard = new Map<number, string>(); // chat pages that answered "who"
+  const waiters = new Map<string, (m: { ok: boolean; text?: string; error?: string; debug?: unknown }) => void>();
+  const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
   channel.onmessage = (e) => {
-    const m = e.data as { kind?: string; page?: string; session?: string; values?: Record<string, FieldValue> };
+    const m = e.data as {
+      kind?: string;
+      page?: string;
+      session?: string;
+      values?: Record<string, FieldValue>;
+      id?: number;
+      title?: string;
+      to?: number;
+      reqId?: string;
+      schema?: FormSchema;
+      followUp?: boolean;
+      ok?: boolean;
+      text?: string;
+      error?: string;
+      debug?: unknown;
+    };
     if (m?.kind === "fill" && m.page === pageId && m.session && m.values) controller.apply(m.session, m.values);
     if (m?.kind === "undo") controller.undo();
+    // Stand-ins for chrome.tabs: chat pages announce themselves and run asks addressed to them.
+    if (m?.kind === "who" && isChat) channel.postMessage({ kind: "here", id: chatId, title: document.title });
+    if (m?.kind === "here" && typeof m.id === "number") heard.set(m.id, m.title ?? "");
+    if (m?.kind === "ask" && isChat && m.to === chatId && m.schema && m.reqId) {
+      const reqId = m.reqId;
+      void askChat(m.schema, !!m.followUp, 30_000).then((r) => channel.postMessage({ kind: "asked", reqId, ...r }));
+    }
+    if (m?.kind === "asked" && m.reqId) waiters.get(m.reqId)?.({ ok: !!m.ok, text: m.text, error: m.error, debug: m.debug });
   };
 
   const newest = (pred: (e: Entry) => boolean = () => true): Entry | undefined =>
@@ -95,6 +126,42 @@ export function createLocalBackend(controller: FormController): WidgetBackend {
       const n = controller.undo();
       if (n === 0) channel.postMessage({ kind: "undo" });
       return { ok: true, restored: n };
+    },
+    async chatTabs() {
+      heard.clear();
+      channel.postMessage({ kind: "who" });
+      await sleep(400);
+      const tabs: ChatTab[] = [...heard].map(([tabId, title]) => ({ tabId, host: "mock-chat", title }));
+      return { ok: true, tabs };
+    },
+    async askChat(tabId, session) {
+      const entry = read().sessions[session];
+      if (!entry) return { ok: false, error: "That form copy has expired. Press ⚡ again." };
+      const ports: RoundPorts = {
+        async ask(schema, followUp) {
+          const reqId = Math.random().toString(36).slice(2);
+          const answer = new Promise<{ ok: boolean; text?: string; error?: string; debug?: unknown }>((resolve) => {
+            waiters.set(reqId, resolve);
+            setTimeout(() => resolve({ ok: false, error: "The chat tab didn't answer." }), 40_000);
+          });
+          channel.postMessage({ kind: "ask", to: tabId, reqId, schema, followUp });
+          const res = await answer;
+          waiters.delete(reqId);
+          return res.ok && res.text ? { ok: true, text: res.text } : { ok: false, error: res.error ?? "The chat didn't answer.", debug: res.debug };
+        },
+        async fill(text, append) {
+          const ex = extractReply(text);
+          if (!ex.ok) return { ok: false, error: ex.error };
+          const r = controller.apply(session, ex.reply.values, append);
+          return r.ok ? { ok: true, summary: r.summary } : r;
+        },
+        async rescan() {
+          const r = controller.rescan();
+          return r ? { ok: true, ...r } : { ok: false, error: "This page hasn't been scanned yet." };
+        },
+      };
+      const out = await runRounds(entry.schema, ports);
+      return out.ok ? { ok: true, summary: out.summary, rounds: out.rounds, note: out.note } : { ok: false, error: out.error, debug: out.debug };
     },
   };
 }

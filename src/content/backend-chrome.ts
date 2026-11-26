@@ -16,4 +16,6 @@ export const chromeBackend: WidgetBackend = {
   latestForm: () => send({ kind: "w:latest" }),
   queueReply: (text) => send({ kind: "w:queue", text }),
   undo: () => send({ kind: "w:undo" }),
+  chatTabs: () => send({ kind: "w:chatTabs" }),
+  askChat: (tabId, session) => send({ kind: "w:ask", tabId, session }),
 };

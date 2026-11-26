@@ -1,8 +1,10 @@
 // Session manager: creates sessions when a form is copied, routes replies to the right tab by session ID,
 // and serves the on-page widget (form pages and chat pages).
 import type { ContentRequest, ContentScanResponse, Fail, ReplyResponse, ScanResponse, StatusMessage, WidgetRequest } from "../shared/messages";
+import { CHAT_HOSTS } from "../shared/chat-hosts";
 import { extractReply } from "../shared/protocol";
-import { SESSION_TTL_MS, type FillSummary, type SessionRecord } from "../shared/types";
+import { emptySummary, runRounds, type RoundPorts } from "../shared/rounds";
+import { SESSION_TTL_MS, type FillSummary, type FormSchema, type SessionRecord } from "../shared/types";
 
 const KEY = "sessions";
 const PENDING = "pending";
@@ -94,7 +96,7 @@ async function scanTab(tabId: number): Promise<ScanResponse> {
   return { ok: true, session: rec };
 }
 
-async function routeReply(text: string, fallbackSession?: string): Promise<ReplyResponse> {
+async function routeReply(text: string, fallbackSession?: string, append = false): Promise<ReplyResponse> {
   const ex = extractReply(text);
   if (!ex.ok) return ex;
   const sessionId = ex.reply.session ?? fallbackSession;
@@ -114,7 +116,12 @@ async function routeReply(text: string, fallbackSession?: string): Promise<Reply
 
   let summary: FillSummary | undefined;
   try {
-    const res = await sendToTab<{ ok: boolean; error?: string; summary?: FillSummary }>(rec.tabId, { kind: "lb:fill", session: sessionId, values: ex.reply.values });
+    const res = await sendToTab<{ ok: boolean; error?: string; summary?: FillSummary }>(rec.tabId, {
+      kind: "lb:fill",
+      session: sessionId,
+      values: ex.reply.values,
+      append,
+    });
     if (!res?.ok) {
       await update(sessionId, { status: "expired" });
       return { ok: false, error: res?.error ?? "The form page didn't respond." };
@@ -184,6 +191,77 @@ async function handleWidget(msg: WidgetRequest, tabId: number): Promise<unknown>
       return routeReply(msg.text, mine?.id);
     }
 
+    case "w:chatTabs": {
+      const found = await chrome.tabs.query({ url: CHAT_HOSTS.map((h) => `*://*.${h}/*`) });
+      const tabs = found
+        .filter((t) => t.id !== undefined && t.id !== tabId)
+        .sort((a, b) => ((b as { lastAccessed?: number }).lastAccessed ?? 0) - ((a as { lastAccessed?: number }).lastAccessed ?? 0))
+        .map((t) => {
+          let host = "";
+          try {
+            host = new URL(t.url ?? "").hostname;
+          } catch {
+            /* keep empty */
+          }
+          return { tabId: t.id!, host, title: t.title ?? "" };
+        });
+      return { ok: true, tabs };
+    }
+
+    case "w:ask": {
+      const rec = (await load())[msg.session];
+      if (!rec || !isLive(rec)) return { ok: false, error: "That form copy has expired. Press ⚡ again." } satisfies Fail;
+      const back = async () => {
+        try {
+          await chrome.tabs.update(rec.tabId, { active: true });
+        } catch {
+          /* form tab gone */
+        }
+      };
+      // Bring the chat forward while it works: you see it answer, and background tabs get throttled.
+      const focusChat = async () => {
+        try {
+          await chrome.tabs.update(msg.tabId, { active: true });
+          const t = await chrome.tabs.get(msg.tabId);
+          if (t.windowId !== undefined) await chrome.windows.update(t.windowId, { focused: true });
+          return true;
+        } catch {
+          return false;
+        }
+      };
+      const ports: RoundPorts = {
+        async ask(schema, followUp) {
+          if (!(await focusChat())) return { ok: false, error: "That chat tab was closed." };
+          try {
+            const res = await sendToTab<{ ok: boolean; text?: string; error?: string; debug?: unknown }>(msg.tabId, { kind: "lb:ask", schema, followUp });
+            if (!res?.ok || !res.text) return { ok: false, error: res?.error ?? "The chat didn't answer.", debug: res?.debug };
+            return { ok: true, text: res.text };
+          } catch {
+            return { ok: false, error: "Couldn't reach that chat tab. Reload it and try again." };
+          }
+        },
+        async fill(text, append) {
+          const r = await routeReply(text, rec.id, append); // switches back to the form tab and fills
+          return r.ok ? { ok: true, summary: r.summary ?? emptySummary() } : { ok: false, error: r.error };
+        },
+        async rescan() {
+          try {
+            const r = await sendToTab<{ ok: boolean; schema: FormSchema; newFieldIds: string[] }>(rec.tabId, { kind: "lb:rescan" });
+            if (!r?.ok) return { ok: false, error: "Couldn't rescan the form." };
+            await update(rec.id, { schema: r.schema });
+            return { ok: true, schema: r.schema, newFieldIds: r.newFieldIds };
+          } catch {
+            return { ok: false, error: "The form page didn't respond." };
+          }
+        },
+      };
+      const out = await runRounds(rec.schema, ports);
+      await back(); // a later round may have left us on the chat tab
+      if (!out.ok) return { ok: false, error: out.error, debug: out.debug } satisfies Fail;
+      await update(rec.id, { status: "filled" });
+      return { ok: true, session: rec.id, tabId: rec.tabId, switchedTab: false, summary: out.summary, rounds: out.rounds, note: out.note };
+    }
+
     case "w:undo": {
       const rec = await newestLive((s) => s.status === "filled");
       if (!rec) return { ok: false, error: "Nothing to undo." } satisfies Fail;
@@ -217,6 +295,22 @@ chrome.runtime.onMessage.addListener((msg: WidgetRequest | StatusMessage, sender
     handleWidget(msg as WidgetRequest, sender.tab.id).then(sendResponse, fail);
     return true;
   }
+});
+
+// Chrome doesn't add a freshly installed or reloaded extension to tabs that were already open, so those tabs
+// would have no widget until refreshed. Put the content script into them ourselves.
+chrome.runtime.onInstalled.addListener(() => {
+  void (async () => {
+    const tabs = await chrome.tabs.query({ url: ["http://*/*", "https://*/*"] });
+    for (const t of tabs) {
+      if (t.id === undefined || t.discarded) continue;
+      try {
+        await chrome.scripting.executeScript({ target: { tabId: t.id }, files: ["content.js"] });
+      } catch {
+        /* a page we're not allowed into (Web Store, etc.) */
+      }
+    }
+  })();
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {

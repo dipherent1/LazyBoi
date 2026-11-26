@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPrompt, extractReply, validateValues } from "../src/shared/protocol";
+import { buildFollowUpPrompt, buildPrompt, extractReply, validateValues } from "../src/shared/protocol";
 import type { FormSchema } from "../src/shared/types";
 
 const schema: FormSchema = {
@@ -128,5 +128,21 @@ describe("validateValues", () => {
 
   it("refuses card-number-looking values", () => {
     expect(v({ f1: "4111 1111 1111 1111" }).items[0]!.issues[0]!.code).toBe("sensitive");
+  });
+});
+
+describe("buildFollowUpPrompt", () => {
+  const more: FormSchema = { ...schema, fields: [{ id: "g1", label: "School", type: "text" }] };
+  const p = buildFollowUpPrompt(more);
+
+  it("keeps the same session and lists only the new fields", () => {
+    expect(p).toContain("Session: lb-7f3a");
+    expect(p).toContain('"id":"g1"');
+    expect(p).not.toContain('"id":"f1"');
+    expect(p).toContain("more fields");
+  });
+
+  it("is never mistaken for a reply when pasted back", () => {
+    expect(extractReply(p).ok).toBe(false);
   });
 });

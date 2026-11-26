@@ -23,6 +23,16 @@ beforeEach(() => {
   document.body.innerHTML = "";
 });
 
+describe("FormController.peek", () => {
+  it("counts fillable fields without replacing the current scan", () => {
+    const { c } = setup();
+    expect(c.peek()).toBe(4);
+    expect(c.current?.session).toBe("lb-1");
+    document.body.innerHTML = "";
+    expect(c.peek()).toBe(0);
+  });
+});
+
 describe("FormController.apply (no preview step)", () => {
   it("fills valid values straight away and reports what it skipped", () => {
     const { c, id } = setup();
@@ -80,5 +90,66 @@ describe("FormController.apply (no preview step)", () => {
     c.apply("lb-1", { [id("Bio")]: "Hello" });
     expect(seen).toHaveLength(1);
     expect(seen[0]!.filled).toBe(1);
+  });
+});
+
+describe("FormController dynamic forms", () => {
+  const reveal = `
+    <label for="s">Status</label><select id="s"><option value="">-</option><option value="student">Student</option></select>
+    <div id="more" hidden><label for="sch">School</label><input id="sch"><label for="prog">Program</label><input id="prog"></div>`;
+
+  function dynamic() {
+    document.body.innerHTML = reveal;
+    document.getElementById("s")!.addEventListener("change", () => ((document.getElementById("more") as HTMLElement).hidden = false));
+    const c = new FormController();
+    const schema = c.scan("lb-d");
+    return { c, id: (l: string) => schema.fields.find((f) => f.label === l)!.id };
+  }
+
+  it("rescan reports only the fields that appeared, keeping the old ids", () => {
+    const { c, id } = dynamic();
+    const statusId = id("Status");
+    const r = c.apply("lb-d", { [statusId]: "Student" });
+    expect(r.ok).toBe(true);
+    const scan = c.rescan()!;
+    expect(scan.schema.fields.map((f) => f.label)).toEqual(["Status", "School", "Program"]);
+    expect(scan.newFieldIds).toHaveLength(2);
+    expect(scan.schema.fields.find((f) => f.label === "Status")!.id).toBe(statusId);
+  });
+
+  it("a field the page merely re-created is not reported as new", () => {
+    document.body.innerHTML = `<div id="w"><label for="n">Name</label><input id="n"></div>`;
+    const c = new FormController();
+    c.scan("lb-r");
+    document.getElementById("w")!.innerHTML = `<label for="n">Name</label><input id="n">`; // a framework re-render
+    expect(c.rescan()!.newFieldIds).toEqual([]);
+  });
+
+  it("applies a follow-up round to the new fields and undoes every round at once", () => {
+    const { c, id } = dynamic();
+    c.apply("lb-d", { [id("Status")]: "Student" });
+    const scan = c.rescan()!;
+    const schoolId = scan.schema.fields.find((f) => f.label === "School")!.id;
+    const second = c.apply("lb-d", { [schoolId]: "UofT" }, true);
+    expect(second.ok && second.summary.filled).toBe(1);
+    expect((document.getElementById("sch") as HTMLInputElement).value).toBe("UofT");
+
+    expect(c.undo()).toBe(2); // the status select and the school box
+    expect((document.getElementById("sch") as HTMLInputElement).value).toBe("");
+    expect((document.getElementById("s") as HTMLSelectElement).value).toBe("");
+  });
+
+  it("a plain apply starts a fresh undo batch", () => {
+    const { c, id } = dynamic();
+    c.apply("lb-d", { [id("Status")]: "Student" });
+    const scan = c.rescan()!;
+    const schoolId = scan.schema.fields.find((f) => f.label === "School")!.id;
+    c.apply("lb-d", { [schoolId]: "UofT" }); // not appended
+    expect(c.undo()).toBe(1);
+    expect((document.getElementById("s") as HTMLSelectElement).value).toBe("student");
+  });
+
+  it("rescan before any scan returns nothing", () => {
+    expect(new FormController().rescan()).toBeNull();
   });
 });
