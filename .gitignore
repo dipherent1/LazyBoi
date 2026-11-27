@@ -2,3 +2,4 @@ node_modules/
 dist/
 playground/harness/
 *.log
+docs/*.md

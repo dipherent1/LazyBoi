@@ -16,8 +16,7 @@ No API keys, no server, no network requests: it drives the chat tabs you already
 npm install
 npm run build
 ```
-
-Open `chrome://extensions`, enable **Developer mode**, click **Load unpacked**, and choose the `dist` folder.
+This will create a `dist` folder then open `chrome://extensions`, enable **Developer mode**, click **Load unpacked**, and choose the `dist` folder.
 
 ## Try it without the extension
 
@@ -43,7 +42,6 @@ src/background/  service worker (routes replies by session id)
 src/popup/       toolbar popup
 playground/      test forms
 tests/           unit tests
-docs/            design docs and manual test checklist
 ```
 
-Built with TypeScript, Chrome Manifest V3 and esbuild. Design notes are in [docs/](docs/SOLUTION_PRD.md).
+Built with TypeScript, Chrome Manifest V3 and esbuild.
