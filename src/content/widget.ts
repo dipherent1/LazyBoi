@@ -22,35 +22,38 @@ type Tone = "ok" | "warn" | "error";
 const CSS = `
 :host { all: initial; position: fixed; top: 0; left: 0; width: 0; height: 0; overflow: visible; }
 * { box-sizing: border-box; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-/* Flat surface with thin borders. */
-.dock { --bg: #e8ecf2; --ink: #4a5468; --muted: #8791a3; --accent: #4a5fd8; --hi: rgba(255,255,255,.95); --lo: rgba(150,163,186,.62);
-  --line: 1px solid rgba(60,70,90,.16);
-
+/* Glass: a dark translucent tint with a blur, so it reads on light and dark pages alike. No shadows. */
+.dock { --bg: rgba(24,26,34,.5); --ink: #f3f5fa; --muted: rgba(255,255,255,.55); --accent: #a9b8ff; --line: 1px solid rgba(255,255,255,.24);
+  --glass: blur(16px) saturate(1.5); --press: rgba(255,255,255,.16);
   position: fixed; right: 0; top: 40vh; z-index: 2147483646; display: flex; align-items: flex-start; color: var(--ink); }
 .dock.off { display: none; }
 .ico { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; display: block; }
-/* Form pages: a faint sliver on the right edge. Hover it and it glides out; move away and it glides back. */
-.dock:not(.inline) { transform: translateX(calc(100% - 16px)); transition: transform .34s cubic-bezier(.2,.8,.2,1) .5s; }
-.dock:not(.inline) .pill { opacity: .45; transition: opacity .25s ease .5s; }
-.dock:not(.inline).has-form .pill { opacity: .9; } /* a form was found on this page */
+/* Form pages: docked, only a thin glass sliver (like a scroll wheel) shows on the right edge. Hover it and the dock pops out. */
+.dock:not(.inline) { transform: translateX(100%); transition: transform .34s cubic-bezier(.2,.8,.2,1) .5s; }
 .dock:not(.inline):hover, .dock:not(.inline).peek, .dock:not(.inline).dragging { transform: none; transition-delay: 0s; }
-.dock:not(.inline):hover .pill, .dock:not(.inline).peek .pill, .dock:not(.inline).dragging .pill { opacity: 1; transition-delay: 0s; }
+.handle { display: none; }
+.dock:not(.inline) .handle { display: block; position: absolute; right: 100%; top: 50%; width: 7px; height: 64px; margin-top: -32px;
+  border-radius: 7px 0 0 7px; background: var(--bg); border: var(--line); border-right: 0; backdrop-filter: var(--glass); -webkit-backdrop-filter: var(--glass);
+  transition: opacity .2s; }
+.dock:not(.inline).has-form .handle { background: rgba(120,140,255,.55); }
+.dock:not(.inline):hover .handle, .dock:not(.inline).peek .handle, .dock:not(.inline).dragging .handle { opacity: 0; }
 /* A wider invisible hover zone around the sliver. */
-.dock:not(.inline)::before { content: ""; position: absolute; left: -16px; top: -14px; bottom: -14px; width: 16px; }
-/* When a form is detected: a little shake and a soft glow, once. */
+.dock:not(.inline)::before { content: ""; position: absolute; left: -18px; top: -10px; bottom: -10px; width: 18px; }
+/* When a form is detected: the sliver gives a small shake, once. */
 .dock:not(.inline).notice { animation: lbnudge 1.2s cubic-bezier(.36,.07,.19,.97); }
 @keyframes lbnudge {
-  0%, 100% { transform: translateX(calc(100% - 16px)); }
-  12% { transform: translateX(calc(100% - 42px)); }
-  26% { transform: translateX(calc(100% - 16px)); }
-  40% { transform: translateX(calc(100% - 34px)); }
-  54% { transform: translateX(calc(100% - 16px)); }
-  68% { transform: translateX(calc(100% - 26px)); }
-  82% { transform: translateX(calc(100% - 16px)); }
+  0%, 100% { transform: translateX(100%); }
+  12% { transform: translateX(calc(100% - 22px)); }
+  26% { transform: translateX(100%); }
+  40% { transform: translateX(calc(100% - 16px)); }
+  54% { transform: translateX(100%); }
+  68% { transform: translateX(calc(100% - 10px)); }
+  82% { transform: translateX(100%); }
 }
 @media (prefers-reduced-motion: reduce) { .dock:not(.inline).notice { animation: none; } }
 .pill { position: relative; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 8px 10px 14px;
-  background: var(--bg); border: var(--line); border-right: 0; border-radius: 22px 0 0 22px; }
+  background: var(--bg); border: var(--line); border-right: 0; border-radius: 22px 0 0 22px;
+  backdrop-filter: var(--glass); -webkit-backdrop-filter: var(--glass); }
 .top { display: flex; align-items: center; width: 100%; gap: 2px; }
 .hide { border: 0; background: none; color: var(--muted); cursor: pointer; padding: 2px; display: flex; border-radius: 50%; }
 .hide .ico { width: 14px; height: 14px; }
@@ -60,10 +63,10 @@ const CSS = `
 .grip .ico { width: 14px; height: 14px; stroke-width: 3; }
 .grip:hover { color: var(--ink); }
 .grip:active { cursor: grabbing; }
-.btn { position: relative; border: 0; cursor: pointer; color: var(--ink); background: var(--bg); border: var(--line);
+.btn { position: relative; border: 0; cursor: pointer; color: var(--ink); background: rgba(255,255,255,.08); border: var(--line);
   transition: background .15s, color .15s; }
-.btn:hover { color: var(--accent); }
-.btn:active { background: rgba(60,70,90,.08); color: var(--accent); }
+.btn:hover { color: var(--accent); background: rgba(255,255,255,.14); }
+.btn:active { background: var(--press); color: var(--accent); }
 .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .btn:disabled { opacity: .55; cursor: default; }
 .btn.icon { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
@@ -71,37 +74,37 @@ const CSS = `
 .btn[data-tip]::after { content: attr(data-tip); position: absolute; right: calc(100% + 16px); top: 50%;
   transform: translateY(-50%) translateX(6px); width: max-content; max-width: 240px; text-align: left; white-space: normal;
   font: 500 12px/1.45 system-ui, sans-serif; letter-spacing: 0; padding: 9px 12px; border-radius: 12px;
-  background: var(--bg); color: var(--ink); border: var(--line);
+  background: var(--bg); color: var(--ink); border: var(--line); backdrop-filter: var(--glass); -webkit-backdrop-filter: var(--glass);
   opacity: 0; pointer-events: none; transition: opacity .15s, transform .15s; }
 .btn[data-tip]:hover::after { opacity: 1; transform: translateY(-50%); transition-delay: .25s; }
 /* A tooltip never shows on top of an open message, list or paste box. */
 .dock:has(.toast:not([hidden])) .btn[data-tip]::after, .dock:has(.panel:not([hidden])) .btn[data-tip]::after { display: none; }
 .toast, .panel { position: absolute; right: calc(100% + 14px); top: 0; background: var(--bg); color: var(--ink);
-  border: var(--line); border-radius: 16px; font-size: 13px; line-height: 1.45; }
+  border: var(--line); border-radius: 16px; font-size: 13px; line-height: 1.45; backdrop-filter: var(--glass); -webkit-backdrop-filter: var(--glass); }
 .toast { display: flex; align-items: center; gap: 10px; padding: 11px 14px; width: max-content; max-width: 320px; cursor: pointer; }
 .toast[hidden], .panel[hidden] { display: none; }
 .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; background: #34b36b ; }
 .dot.warn { background: #e0a030; } .dot.error { background: #e0584f; }
-.act { border: 0; border-radius: 999px; padding: 6px 13px; background: var(--bg); color: var(--accent); border: var(--line);
+.act { border: 0; border-radius: 999px; padding: 6px 13px; background: rgba(255,255,255,.1); color: var(--accent); border: var(--line);
   font-size: 12px; font-weight: 700; cursor: pointer; flex: none; }
-.act:active { background: rgba(60,70,90,.08); }
+.act:active { background: var(--press); }
 .panel { width: 320px; padding: 14px; }
 .ptitle { display: flex; align-items: center; justify-content: space-between; font-weight: 700; margin-bottom: 10px; }
 .pclose { border: 0; background: none; color: var(--muted); cursor: pointer; padding: 2px; display: flex; }
 .pclose .ico { width: 16px; height: 16px; }
 .pclose:hover { color: var(--accent); }
 .panel textarea { width: 100%; height: 110px; resize: vertical; border: var(--line); border-radius: 12px; padding: 10px;
-  background: var(--bg); color: var(--ink); font: 12px/1.4 ui-monospace, Consolas, monospace; }
+  background: rgba(0,0,0,.28); color: var(--ink); font: 12px/1.4 ui-monospace, Consolas, monospace; }
 .panel textarea:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
-.perr { color: #c4453d; font-size: 12px; margin-top: 6px; }
+.perr { color: #ff9a92; font-size: 12px; margin-top: 6px; }
 .prow { display: flex; gap: 10px; margin-top: 10px; }
-.mini { flex: 1; border: var(--line); background: var(--bg); color: var(--ink); border-radius: 999px; padding: 8px 10px; font-size: 12.5px; cursor: pointer; }
-.mini:active { background: rgba(60,70,90,.08); }
+.mini { flex: 1; border: var(--line); background: rgba(255,255,255,.08); color: var(--ink); border-radius: 999px; padding: 8px 10px; font-size: 12.5px; cursor: pointer; }
+.mini:active { background: var(--press); }
 .mini.primary { color: var(--accent); font-weight: 700; }
 .mini:disabled { opacity: .55; cursor: default; }
-.tabrow { display: block; width: 100%; text-align: left; border: 0; background: var(--bg); color: var(--ink); border: var(--line);
+.tabrow { display: block; width: 100%; text-align: left; border: 0; background: rgba(255,255,255,.08); color: var(--ink); border: var(--line);
   border-radius: 12px; padding: 9px 12px; margin-top: 10px; cursor: pointer; font-size: 12.5px; }
-.tabrow:hover, .tabrow:focus-visible { background: rgba(60,70,90,.08); outline: none; }
+.tabrow:hover, .tabrow:focus-visible { background: var(--press); outline: none; }
 .tabrow b { display: block; font-size: 11.5px; color: var(--accent); }
 .tabrow span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 280px; }
 .pnote { color: var(--muted); font-size: 11.5px; margin-top: 12px; }
@@ -109,11 +112,10 @@ const CSS = `
 .dock.inline { left: auto; top: 0; }
 .dock.inline .top { display: none; }
 .dock.inline .pill { flex-direction: row; align-items: center; gap: 0; padding: 5px; border: var(--line); border-radius: 999px;
-  opacity: .6; transition: opacity .25s ease; }
-.dock.inline:hover .pill, .dock.inline.peek .pill { opacity: 1; }
+  }
 /* Idle: just a small chip beside the message box. Hover it and Paste / Copy unfold to its left. */
 .dock.inline .chip { width: 30px; height: 30px; flex: none; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-  background: var(--bg); color: var(--accent); border: var(--line); user-select: none; }
+  background: rgba(255,255,255,.1); color: var(--accent); border: var(--line); user-select: none; }
 .dock.inline .chip .ico { width: 15px; height: 15px; }
 .dock.inline .btns { display: none; align-items: center; gap: 8px; margin: 0 8px 0 4px; }
 .dock.inline:hover .btns, .dock.inline.peek .btns { display: flex; animation: lbpop .24s cubic-bezier(.2,.8,.2,1); }
@@ -198,7 +200,7 @@ export function mountWidget(opts: WidgetOptions): { destroy(): void } {
   panel.hidden = true;
   const picker = h("div", { class: "panel" }); // "Ask which chat?" list
   picker.hidden = true;
-  dock.append(toastBox, panel, picker, pill);
+  dock.append(toastBox, panel, picker, h("div", { class: "handle", "aria-hidden": "true" }), pill);
   pill.append(h("div", { class: "top" }, grip, hideBtn));
   root.append(dock);
 
