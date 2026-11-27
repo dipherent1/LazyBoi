@@ -2,9 +2,7 @@
 
 A Chrome extension that lets any web form talk to any AI chat. Press one button on a form, pick one of your open chat tabs (ChatGPT, Claude, Gemini, …), and the AI fills the form for you. You can undo, and you submit.
 
-[![lazyBoi demo video](https://img.youtube.com/vi/VvcKEKWExqs/maxresdefault.jpg)](https://youtu.be/VvcKEKWExqs)
-
-▶ [Watch the demo](https://youtu.be/VvcKEKWExqs)
+https://github.com/user-attachments/assets/7ae94631-4457-40be-8070-a4453a10fc30
 
 ## How it works
 
