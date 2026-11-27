@@ -98,7 +98,7 @@ export function createLocalBackend(controller: FormController): WidgetBackend {
     async markCopied() {},
     async fillFromPending() {
       const mine = newest((e) => e.page === pageId);
-      if (!mine) return { ok: false, code: "no_session", error: "Copy this form first (press 📋), then ask your AI." };
+      if (!mine) return { ok: false, code: "no_session", error: "Copy this form first (press Copy form), then ask your AI." };
       const store = read();
       const text = store.pending[mine.id];
       if (!text) return { ok: false, code: "no_reply", error: "No reply waiting." };
@@ -109,7 +109,7 @@ export function createLocalBackend(controller: FormController): WidgetBackend {
     submitReply: (text) => route(text, newest((e) => e.page === pageId)?.id),
     async latestForm() {
       const e = newest();
-      if (!e) return { ok: false, error: "No form copied yet. Open the form page and press 📋 first." };
+      if (!e) return { ok: false, error: "No form copied yet. Open the form page and press Copy form first." };
       return { ok: true, schema: e.schema, title: e.schema.page.title || "your form" };
     },
     async queueReply(text) {
@@ -136,7 +136,7 @@ export function createLocalBackend(controller: FormController): WidgetBackend {
     },
     async askChat(tabId, session) {
       const entry = read().sessions[session];
-      if (!entry) return { ok: false, error: "That form copy has expired. Press ⚡ again." };
+      if (!entry) return { ok: false, error: "That form copy has expired. Press Fill with AI again." };
       const ports: RoundPorts = {
         async ask(schema, followUp) {
           const reqId = Math.random().toString(36).slice(2);
