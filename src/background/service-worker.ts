@@ -157,7 +157,7 @@ async function handleWidget(msg: WidgetRequest, tabId: number): Promise<unknown>
 
     case "w:latest": {
       const rec = await newestLive();
-      if (!rec) return { ok: false, error: "No form copied yet. Open the form page and press 📋 first." } satisfies Fail;
+      if (!rec) return { ok: false, error: "No form copied yet. Open the form page and press Copy form first." } satisfies Fail;
       await update(rec.id, { status: "awaiting_reply" });
       return { ok: true, schema: rec.schema, title: rec.schema.page.title || rec.title || "your form" };
     }
@@ -177,7 +177,7 @@ async function handleWidget(msg: WidgetRequest, tabId: number): Promise<unknown>
 
     case "w:fill": {
       const rec = await newestLive((s) => s.tabId === tabId);
-      if (!rec) return { ok: false, code: "no_session", error: "Copy this form first (press 📋), then ask your AI." } satisfies Fail;
+      if (!rec) return { ok: false, code: "no_session", error: "Copy this form first (press Copy form), then ask your AI." } satisfies Fail;
       const pending = await loadPending();
       const text = pending[rec.id];
       if (!text) return { ok: false, code: "no_reply", error: "No reply waiting." } satisfies Fail;
@@ -210,7 +210,7 @@ async function handleWidget(msg: WidgetRequest, tabId: number): Promise<unknown>
 
     case "w:ask": {
       const rec = (await load())[msg.session];
-      if (!rec || !isLive(rec)) return { ok: false, error: "That form copy has expired. Press ⚡ again." } satisfies Fail;
+      if (!rec || !isLive(rec)) return { ok: false, error: "That form copy has expired. Press Fill with AI again." } satisfies Fail;
       const back = async () => {
         try {
           await chrome.tabs.update(rec.tabId, { active: true });
