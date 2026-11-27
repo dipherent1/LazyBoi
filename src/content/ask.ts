@@ -1,5 +1,5 @@
 // Runs inside a chat tab: put the form prompt in the message box, press Send, wait for lazyBoi's reply.
-// Only ever triggered by the user pressing the ⚡ button and picking this tab.
+// Only ever triggered by the user pressing the Fill with AI button and picking this tab.
 import { buildFollowUpPrompt, buildPrompt } from "../shared/protocol";
 import type { FormSchema } from "../shared/types";
 import { diagnose, findComposer, findLatestReply, findSendButton, isStreaming, tryInsert } from "./chat";

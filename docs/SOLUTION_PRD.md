@@ -1,5 +1,7 @@
 # lazyBoi — Solution Analysis & Implementation PRD
 
+> **Note:** this is an early planning document. The shipped extension differs in places (see the README); the vault is future work.
+
 Status: draft v0.2 · Supersedes the phase plan in `PRD.md` (v0.1). The contracts in `PRD.md` §4 (session, schema, reply) still hold and are reused here.
 
 > **Update (v0.3 scope change):** the vault (Part 4.4, 4.5, and the vault pieces of Phases 2–3) is **deferred**: lazyBoi holds no stored user data for now. Phase 2 became **the on-page widget and chat-page buttons**: a dock on the right edge (📋 Copy form / ✨ Fill form on form pages; **Paste** / **Copy** on chat pages), hover explanations, and a stronger prompt. Built; see README. The vault sections stay below as future work.

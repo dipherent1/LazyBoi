@@ -3,7 +3,7 @@ import manifest from "../extension/manifest.json";
 import { CHAT_HOSTS } from "../src/shared/chat-hosts";
 
 describe("manifest", () => {
-  it("can see tabs on every chat site (needed to list them in the ⚡ picker)", () => {
+  it("can see tabs on every chat site (needed to list them in the Fill with AI picker)", () => {
     const perms = manifest.host_permissions;
     // "<all_urls>" covers them all; otherwise each chat site must be listed.
     const covered = (host: string) => perms.includes("<all_urls>") || perms.includes(`*://*.${host}/*`);

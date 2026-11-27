@@ -2,7 +2,7 @@
   "name": "lazyboi",
   "version": "0.1.0",
   "private": true,
-  "description": "Let any web form talk to any AI chat. Phase 1: scanner, filler, preview, copy/paste transport.",
+  "description": "Let any web form talk to any AI chat: scan a form, ask your open chat, fill it, undo.",
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",

@@ -1,4 +1,4 @@
-// Contracts shared by every part of lazyBoi. See PRD.md §4.
+// Contracts shared by every part of lazyBoi. See docs/PRD.md §4.
 
 export const PROTOCOL_VERSION = 1 as const;
 

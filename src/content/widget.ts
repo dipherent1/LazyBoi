@@ -1,5 +1,5 @@
 // The on-page widget. Always there, floating:
-//  • form pages: a dock on the right edge  📋 Copy form (scans + copies)  ·  ✨ Paste into form (fills it)
+//  • form pages: a dock on the right edge: Fill with AI, Copy form (scans + copies), Paste into form (fills it)
 //  • chat pages: a small bar next to the message box  Paste (form → message box)  ·  Copy (AI reply → form)
 // Every button explains itself on hover. Nothing is ever sent or submitted for you.
 import { getHiddenHosts, HIDDEN_HOSTS_KEY, setHostHidden } from "../shared/prefs";
@@ -7,7 +7,7 @@ import { buildPrompt } from "../shared/protocol";
 import type { FillSummary } from "../shared/types";
 import type { ChatTab, WidgetBackend } from "./backend";
 import { diagnose, findComposer, findLatestReply, tryInsert } from "./chat";
-import { copyText, h } from "./dom";
+import { copyText, h, icon } from "./dom";
 import { WIDGET_HOST_ID } from "./scanner";
 
 export interface WidgetOptions {
@@ -22,19 +22,23 @@ type Tone = "ok" | "warn" | "error";
 const CSS = `
 :host { all: initial; position: fixed; top: 0; left: 0; width: 0; height: 0; overflow: visible; }
 * { box-sizing: border-box; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-.dock { position: fixed; right: 0; top: 40vh; z-index: 2147483646; display: flex; align-items: flex-start; }
+/* Flat surface with thin borders. */
+.dock { --bg: #e8ecf2; --ink: #4a5468; --muted: #8791a3; --accent: #4a5fd8; --hi: rgba(255,255,255,.95); --lo: rgba(150,163,186,.62);
+  --line: 1px solid rgba(60,70,90,.16);
+
+  position: fixed; right: 0; top: 40vh; z-index: 2147483646; display: flex; align-items: flex-start; color: var(--ink); }
 .dock.off { display: none; }
+.ico { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; display: block; }
 /* Form pages: a faint sliver on the right edge. Hover it and it glides out; move away and it glides back. */
 .dock:not(.inline) { transform: translateX(calc(100% - 16px)); transition: transform .34s cubic-bezier(.2,.8,.2,1) .5s; }
-.dock:not(.inline) .pill { opacity: .4; border-left: 3px solid rgba(109,77,255,.85); transition: opacity .25s ease .5s; }
-.dock:not(.inline).has-form .pill { opacity: .85; } /* a form was found on this page */
+.dock:not(.inline) .pill { opacity: .45; transition: opacity .25s ease .5s; }
+.dock:not(.inline).has-form .pill { opacity: .9; } /* a form was found on this page */
 .dock:not(.inline):hover, .dock:not(.inline).peek, .dock:not(.inline).dragging { transform: none; transition-delay: 0s; }
 .dock:not(.inline):hover .pill, .dock:not(.inline).peek .pill, .dock:not(.inline).dragging .pill { opacity: 1; transition-delay: 0s; }
 /* A wider invisible hover zone around the sliver. */
 .dock:not(.inline)::before { content: ""; position: absolute; left: -16px; top: -14px; bottom: -14px; width: 16px; }
 /* When a form is detected: a little shake and a soft glow, once. */
 .dock:not(.inline).notice { animation: lbnudge 1.2s cubic-bezier(.36,.07,.19,.97); }
-.dock:not(.inline).notice .pill { animation: lbglow 1.8s ease-out; }
 @keyframes lbnudge {
   0%, 100% { transform: translateX(calc(100% - 16px)); }
   12% { transform: translateX(calc(100% - 42px)); }
@@ -44,80 +48,79 @@ const CSS = `
   68% { transform: translateX(calc(100% - 26px)); }
   82% { transform: translateX(calc(100% - 16px)); }
 }
-@keyframes lbglow {
-  0% { box-shadow: -6px 10px 30px rgba(20,10,50,.38), 0 0 0 0 rgba(109,77,255,.75); }
-  100% { box-shadow: -6px 10px 30px rgba(20,10,50,.38), 0 0 0 16px rgba(109,77,255,0); }
-}
 @media (prefers-reduced-motion: reduce) { .dock:not(.inline).notice { animation: none; } }
-.pill { position: relative; display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 6px 7px 9px;
-  background: rgba(27,24,42,.94); border: 1px solid rgba(255,255,255,.1); border-right: 0; border-radius: 20px 0 0 20px;
-  box-shadow: -6px 10px 30px rgba(20,10,50,.38); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+.pill { position: relative; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 8px 10px 14px;
+  background: var(--bg); border: var(--line); border-right: 0; border-radius: 22px 0 0 22px; }
 .top { display: flex; align-items: center; width: 100%; gap: 2px; }
-.hide { border: 0; background: none; color: rgba(255,255,255,.35); font-size: 16px; line-height: 1; cursor: pointer; padding: 0 3px; }
-.hide:hover { color: #fff; }
-.grip { flex: 1; height: 14px; cursor: grab; display: flex; align-items: center; justify-content: center;
-  color: rgba(255,255,255,.35); font-size: 11px; letter-spacing: 1px; user-select: none; touch-action: none; }
-.grip:hover { color: rgba(255,255,255,.7); }
+.hide { border: 0; background: none; color: var(--muted); cursor: pointer; padding: 2px; display: flex; border-radius: 50%; }
+.hide .ico { width: 14px; height: 14px; }
+.hide:hover { color: var(--accent); }
+.grip { flex: 1; height: 16px; cursor: grab; display: flex; align-items: center; justify-content: center;
+  color: var(--muted); user-select: none; touch-action: none; }
+.grip .ico { width: 14px; height: 14px; stroke-width: 3; }
+.grip:hover { color: var(--ink); }
 .grip:active { cursor: grabbing; }
-.btn { position: relative; border: 0; cursor: pointer; color: #fff; background: rgba(255,255,255,.08);
-  transition: background .15s, transform .15s, box-shadow .15s; }
-.btn:hover { background: #6d4dff; transform: scale(1.06); box-shadow: 0 4px 14px rgba(109,77,255,.45); }
-.btn:active { transform: scale(.96); }
-.btn:focus-visible { outline: 2px solid #b6a6ff; outline-offset: 2px; }
-.btn:disabled { opacity: .55; cursor: default; transform: none; }
-.btn.emoji { width: 44px; height: 44px; border-radius: 50%; font-size: 21px; line-height: 1; display: flex; align-items: center; justify-content: center; }
-.btn.word { min-width: 68px; padding: 9px 14px; border-radius: 999px; font-size: 12.5px; font-weight: 700; letter-spacing: .02em; }
-.btn[data-tip]::after { content: attr(data-tip); position: absolute; right: calc(100% + 14px); top: 50%;
+.btn { position: relative; border: 0; cursor: pointer; color: var(--ink); background: var(--bg); border: var(--line);
+  transition: background .15s, color .15s; }
+.btn:hover { color: var(--accent); }
+.btn:active { background: rgba(60,70,90,.08); color: var(--accent); }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.btn:disabled { opacity: .55; cursor: default; }
+.btn.icon { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+.btn.word { min-width: 68px; padding: 8px 15px; border-radius: 999px; font-size: 12.5px; font-weight: 600; letter-spacing: .02em; }
+.btn[data-tip]::after { content: attr(data-tip); position: absolute; right: calc(100% + 16px); top: 50%;
   transform: translateY(-50%) translateX(6px); width: max-content; max-width: 240px; text-align: left; white-space: normal;
-  font: 500 12px/1.45 system-ui, sans-serif; letter-spacing: 0; padding: 9px 11px; border-radius: 11px;
-  background: #12101c; color: #ececf3; border: 1px solid rgba(255,255,255,.1); box-shadow: 0 10px 28px rgba(0,0,0,.4);
+  font: 500 12px/1.45 system-ui, sans-serif; letter-spacing: 0; padding: 9px 12px; border-radius: 12px;
+  background: var(--bg); color: var(--ink); border: var(--line);
   opacity: 0; pointer-events: none; transition: opacity .15s, transform .15s; }
 .btn[data-tip]:hover::after { opacity: 1; transform: translateY(-50%); transition-delay: .25s; }
-.toast, .panel { position: absolute; right: calc(100% + 12px); top: 0; background: #12101c; color: #ececf3;
-  border: 1px solid rgba(255,255,255,.12); border-radius: 14px; box-shadow: 0 12px 34px rgba(0,0,0,.42); font-size: 13px; line-height: 1.45; }
-.toast { display: flex; align-items: center; gap: 9px; padding: 10px 12px; width: max-content; max-width: 320px; cursor: pointer; }
+/* A tooltip never shows on top of an open message, list or paste box. */
+.dock:has(.toast:not([hidden])) .btn[data-tip]::after, .dock:has(.panel:not([hidden])) .btn[data-tip]::after { display: none; }
+.toast, .panel { position: absolute; right: calc(100% + 14px); top: 0; background: var(--bg); color: var(--ink);
+  border: var(--line); border-radius: 16px; font-size: 13px; line-height: 1.45; }
+.toast { display: flex; align-items: center; gap: 10px; padding: 11px 14px; width: max-content; max-width: 320px; cursor: pointer; }
 .toast[hidden], .panel[hidden] { display: none; }
-.dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: #22c55e; }
-.dot.warn { background: #f59e0b; } .dot.error { background: #ef4444; }
-.act { border: 0; border-radius: 8px; padding: 5px 10px; background: #6d4dff; color: #fff; font-size: 12px; font-weight: 700; cursor: pointer; flex: none; }
-.act:hover { background: #7d60ff; }
-.panel { width: 320px; padding: 12px; }
-.ptitle { display: flex; align-items: center; justify-content: space-between; font-weight: 700; margin-bottom: 8px; }
-.pclose { border: 0; background: none; color: #9a97ad; font-size: 18px; line-height: 1; cursor: pointer; padding: 0 2px; }
-.pclose:hover { color: #fff; }
-.panel textarea { width: 100%; height: 110px; resize: vertical; border: 1px solid rgba(255,255,255,.15); border-radius: 10px; padding: 8px;
-  background: #1b182a; color: #ececf3; font: 12px/1.4 ui-monospace, Consolas, monospace; }
-.panel textarea:focus { outline: 2px solid #6d4dff; }
-.perr { color: #fca5a5; font-size: 12px; margin-top: 6px; }
-.prow { display: flex; gap: 8px; margin-top: 8px; }
-.mini { flex: 1; border: 1px solid rgba(255,255,255,.18); background: transparent; color: #ececf3; border-radius: 9px; padding: 7px 10px; font-size: 12.5px; cursor: pointer; }
-.mini:hover { background: rgba(255,255,255,.08); }
-.mini.primary { background: #6d4dff; border-color: #6d4dff; font-weight: 700; }
-.mini.primary:hover { background: #7d60ff; }
+.dot { width: 9px; height: 9px; border-radius: 50%; flex: none; background: #34b36b ; }
+.dot.warn { background: #e0a030; } .dot.error { background: #e0584f; }
+.act { border: 0; border-radius: 999px; padding: 6px 13px; background: var(--bg); color: var(--accent); border: var(--line);
+  font-size: 12px; font-weight: 700; cursor: pointer; flex: none; }
+.act:active { background: rgba(60,70,90,.08); }
+.panel { width: 320px; padding: 14px; }
+.ptitle { display: flex; align-items: center; justify-content: space-between; font-weight: 700; margin-bottom: 10px; }
+.pclose { border: 0; background: none; color: var(--muted); cursor: pointer; padding: 2px; display: flex; }
+.pclose .ico { width: 16px; height: 16px; }
+.pclose:hover { color: var(--accent); }
+.panel textarea { width: 100%; height: 110px; resize: vertical; border: var(--line); border-radius: 12px; padding: 10px;
+  background: var(--bg); color: var(--ink); font: 12px/1.4 ui-monospace, Consolas, monospace; }
+.panel textarea:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+.perr { color: #c4453d; font-size: 12px; margin-top: 6px; }
+.prow { display: flex; gap: 10px; margin-top: 10px; }
+.mini { flex: 1; border: var(--line); background: var(--bg); color: var(--ink); border-radius: 999px; padding: 8px 10px; font-size: 12.5px; cursor: pointer; }
+.mini:active { background: rgba(60,70,90,.08); }
+.mini.primary { color: var(--accent); font-weight: 700; }
 .mini:disabled { opacity: .55; cursor: default; }
-.tabrow { display: block; width: 100%; text-align: left; border: 1px solid rgba(255,255,255,.14); background: transparent; color: #ececf3;
-  border-radius: 10px; padding: 8px 10px; margin-top: 7px; cursor: pointer; font-size: 12.5px; }
-.tabrow:hover, .tabrow:focus-visible { background: #6d4dff; border-color: #6d4dff; outline: none; }
-.tabrow b { display: block; font-size: 11.5px; color: #b6a6ff; }
-.tabrow:hover b, .tabrow:focus-visible b { color: #fff; }
-.tabrow span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 290px; }
-.pnote { color: #9a97ad; font-size: 11.5px; margin-top: 9px; }
+.tabrow { display: block; width: 100%; text-align: left; border: 0; background: var(--bg); color: var(--ink); border: var(--line);
+  border-radius: 12px; padding: 9px 12px; margin-top: 10px; cursor: pointer; font-size: 12.5px; }
+.tabrow:hover, .tabrow:focus-visible { background: rgba(60,70,90,.08); outline: none; }
+.tabrow b { display: block; font-size: 11.5px; color: var(--accent); }
+.tabrow span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 280px; }
+.pnote { color: var(--muted); font-size: 11.5px; margin-top: 12px; }
 /* Chat pages: a small bar that floats next to the message box instead of the screen edge. */
 .dock.inline { left: auto; top: 0; }
 .dock.inline .top { display: none; }
-.dock.inline .pill { flex-direction: row; align-items: center; gap: 0; padding: 4px; border: 1px solid rgba(255,255,255,.12); border-radius: 999px;
-  box-shadow: 0 6px 20px rgba(20,10,50,.3); opacity: .5; transition: opacity .25s ease, box-shadow .25s ease; }
+.dock.inline .pill { flex-direction: row; align-items: center; gap: 0; padding: 5px; border: var(--line); border-radius: 999px;
+  opacity: .6; transition: opacity .25s ease; }
 .dock.inline:hover .pill, .dock.inline.peek .pill { opacity: 1; }
 /* Idle: just a small chip beside the message box. Hover it and Paste / Copy unfold to its left. */
-.dock.inline .chip { width: 28px; height: 28px; flex: none; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-  background: linear-gradient(135deg, #6d4dff, #9a7bff); color: #fff; font-size: 13px; line-height: 1; user-select: none; }
-.dock.inline .btns { display: none; align-items: center; gap: 4px; margin-right: 6px; }
+.dock.inline .chip { width: 30px; height: 30px; flex: none; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: var(--bg); color: var(--accent); border: var(--line); user-select: none; }
+.dock.inline .chip .ico { width: 15px; height: 15px; }
+.dock.inline .btns { display: none; align-items: center; gap: 8px; margin: 0 8px 0 4px; }
 .dock.inline:hover .btns, .dock.inline.peek .btns { display: flex; animation: lbpop .24s cubic-bezier(.2,.8,.2,1); }
 @keyframes lbpop { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: none; } }
-.dock.inline .btn.word { min-width: 0; padding: 6px 13px; font-size: 12px; }
-.dock.inline .hide { font-size: 14px; padding: 0 4px; }
-.dock.inline .toast, .dock.inline .panel { right: 0; left: auto; top: auto; bottom: calc(100% + 10px); }
-.dock.inline .btn[data-tip]::after { right: auto; left: 50%; top: auto; bottom: calc(100% + 12px); transform: translateX(-50%) translateY(4px); }
+.dock.inline .btn.word { min-width: 0; padding: 6px 14px; font-size: 12px; }
+.dock.inline .toast, .dock.inline .panel { right: 0; left: auto; top: auto; bottom: calc(100% + 12px); }
+.dock.inline .btn[data-tip]::after { right: auto; left: 50%; top: auto; bottom: calc(100% + 14px); transform: translateX(-50%) translateY(4px); }
 .dock.inline .btn[data-tip]:hover::after { transform: translateX(-50%); }
 @media (prefers-reduced-motion: reduce) { .dock, .btn { transition: none; } }
 `;
@@ -187,8 +190,8 @@ export function mountWidget(opts: WidgetOptions): { destroy(): void } {
 
   const dock = h("div", { class: opts.mode === "chat" ? "dock off inline" : "dock off" });
   const pill = h("div", { class: "pill" });
-  const grip = h("div", { class: "grip", title: "Drag to move" }, "⋮⋮");
-  const hideBtn = h("button", { class: "hide", type: "button", title: "Hide lazyBoi on this site", "aria-label": "Hide lazyBoi on this site" }, "×");
+  const grip = h("div", { class: "grip", title: "Drag to move" }, icon("grip"));
+  const hideBtn = h("button", { class: "hide", type: "button", title: "Hide lazyBoi on this site", "aria-label": "Hide lazyBoi on this site" }, icon("x"));
   const toastBox = h("div", { class: "toast", role: "status", "aria-live": "polite" });
   toastBox.hidden = true;
   const panel = h("div", { class: "panel" });
@@ -199,7 +202,7 @@ export function mountWidget(opts: WidgetOptions): { destroy(): void } {
   pill.append(h("div", { class: "top" }, grip, hideBtn));
   root.append(dock);
 
-  const button = (kind: "emoji" | "word", text: string, label: string, tip: string) =>
+  const button = (kind: "icon" | "word", text: string | Node, label: string, tip: string) =>
     h("button", { class: `btn ${kind}`, type: "button", "aria-label": label, "data-tip": tip }, text);
 
   // ---- toast ----
@@ -278,7 +281,7 @@ export function mountWidget(opts: WidgetOptions): { destroy(): void } {
   const perr = h("div", { class: "perr" });
   const pasteClip = h("button", { class: "mini", type: "button" }, "Paste clipboard");
   const go = h("button", { class: "mini primary", type: "button" }, "Fill form");
-  const closeX = h("button", { class: "pclose", type: "button", title: "Close (Esc)", "aria-label": "Close" }, "×");
+  const closeX = h("button", { class: "pclose", type: "button", title: "Close (Esc)", "aria-label": "Close" }, icon("x"));
   panel.append(h("div", { class: "ptitle" }, "Paste the AI's reply", closeX), ta, perr, h("div", { class: "prow" }, pasteClip, go));
 
   function openPanel(message = "") {
@@ -301,7 +304,7 @@ export function mountWidget(opts: WidgetOptions): { destroy(): void } {
   function openPicker(tabs: ChatTab[], onPick: (t: ChatTab) => void) {
     hideToast();
     closePanel();
-    const x = h("button", { class: "pclose", type: "button", title: "Close (Esc)", "aria-label": "Close" }, "×");
+    const x = h("button", { class: "pclose", type: "button", title: "Close (Esc)", "aria-label": "Close" }, icon("x"));
     x.addEventListener("click", () => closePanel());
     const rows = tabs.map((t) => {
       const b = h("button", { class: "tabrow", type: "button" }, h("b", {}, t.host || "chat"), h("span", {}, t.title || "(untitled)"));
@@ -362,11 +365,11 @@ export function mountWidget(opts: WidgetOptions): { destroy(): void } {
 
   // ---- buttons ----
   if (opts.mode === "form") {
-    const copyBtn = button("emoji", "📋", "Copy form", "Copy form: scans this page and copies a prompt for your AI chat.");
-    const fillBtn = button("emoji", "✨", "Paste into form", "Paste into form: fills this form from the AI's reply. You can undo, and you press Submit yourself.");
+    const copyBtn = button("icon", icon("copy"), "Copy form", "Copy form: scans this page and copies a prompt for your AI chat.");
+    const fillBtn = button("icon", icon("clipboard-check"), "Paste into form", "Paste into form: fills this form from the AI's reply. You can undo, and you press Submit yourself.");
     const aiBtn = button(
-      "emoji",
-      "⚡",
+      "icon",
+      icon("zap"),
       "Fill with AI",
       "Fill with AI: pick one of your open chat tabs. lazyBoi sends the form there, waits for the reply, and fills this page. You can undo.",
     );
@@ -380,7 +383,7 @@ export function mountWidget(opts: WidgetOptions): { destroy(): void } {
       if (!r.schema.fields.length) return toast("No fillable fields found on this page.", "error");
       const t = await backend.chatTabs();
       if (!t.ok) return toast(t.error, "error");
-      if (!t.tabs.length) return toast("No chat tab is open. Open claude.ai, ChatGPT or another supported chat, then press ⚡ again.", "error");
+      if (!t.tabs.length) return toast("No chat tab is open. Open claude.ai, ChatGPT or another supported chat, then press Fill with AI again.", "error");
       openPicker(t.tabs, async (tab) => {
         asking = true;
         toast(`Asking ${tab.host || "the chat"}… this can take a minute.`, "ok", undefined, true);
@@ -419,13 +422,13 @@ export function mountWidget(opts: WidgetOptions): { destroy(): void } {
 
     // Any fill on this page (from here or from the chat tab) is reported with Undo.
     listen(document, "lazyboi-filled", ((e: CustomEvent<FillSummary>) => {
-      if (!asking) reportFill(e.detail); // while ⚡ is working, the combined result is reported once at the end
+      if (!asking) reportFill(e.detail); // while Fill with AI is working, the combined result is reported once at the end
     }) as EventListener);
   } else {
     const pasteBtn = button("word", "Paste", "Paste form", "Paste: puts the form you copied into this chat's message box. You press Send.");
     const copyBtn = button("word", "Copy", "Copy reply", "Copy: copies the AI's lazyBoi reply so your form can fill from it.");
-    const hideInline = h("button", { class: "hide", type: "button", title: "Hide lazyBoi on this site", "aria-label": "Hide lazyBoi on this site" }, "×");
-    pill.append(h("div", { class: "btns" }, pasteBtn, copyBtn, hideInline), h("div", { class: "chip", "aria-hidden": "true" }, "✦"));
+    const hideInline = h("button", { class: "hide", type: "button", title: "Hide lazyBoi on this site", "aria-label": "Hide lazyBoi on this site" }, icon("x"));
+    pill.append(h("div", { class: "btns" }, pasteBtn, copyBtn, hideInline), h("div", { class: "chip", "aria-hidden": "true" }, icon("star")));
 
     guard(pasteBtn, async () => {
       const r = await backend.latestForm();
@@ -445,7 +448,7 @@ export function mountWidget(opts: WidgetOptions): { destroy(): void } {
       const copied = await copyText(clean);
       const q = await backend.queueReply(clean);
       if (!q.ok) return toast(`${copied ? "Copied, but " : ""}${q.error.charAt(0).toLowerCase()}${q.error.slice(1)}`, "warn");
-      toast(`Reply copied. Press ✨ on “${q.formTitle}”.`, "ok", {
+      toast(`Reply copied. Press Paste into form on “${q.formTitle}”.`, "ok", {
         label: "Fill now",
         run: async () => {
           const r = await backend.submitReply(clean);
@@ -504,7 +507,7 @@ export function mountWidget(opts: WidgetOptions): { destroy(): void } {
       }
     };
     chrome.storage.onChanged.addListener(onChanged);
-    cleanups.push(() => chrome.storage.onChanged.removeListener(onChanged));
+    cleanups.push(() => chrome.storage?.onChanged?.removeListener(onChanged));
   }
   const onHide = () => {
     toast("Hidden on this site. Turn it back on from the lazyBoi toolbar icon.");
