@@ -17,11 +17,7 @@ const controller = new FormController();
 
 function sendStatus(session: string) {
   const msg: StatusMessage = { kind: "lb:status", session, status: "filled" };
-  try {
-    chrome.runtime.sendMessage(msg).catch(() => {});
-  } catch {
-    /* extension was reloaded; this page needs a refresh */
-  }
+  chrome.runtime.sendMessage(msg).catch(() => {});
 }
 
 function handle(msg: ContentRequest): unknown {
@@ -46,10 +42,7 @@ function handle(msg: ContentRequest): unknown {
   }
 }
 
-// After the extension is reloaded or updated, an old copy of this script can be left in an open tab with a
-// dead connection (chrome.runtime.onMessage is gone). Do nothing there; a refresh brings back a working copy.
-const connected = typeof chrome !== "undefined" && !!chrome.runtime?.id && !!chrome.runtime.onMessage;
-if (connected && !window.__lazyBoiContent) {
+if (!window.__lazyBoiContent) {
   window.__lazyBoiContent = true;
   chrome.runtime.onMessage.addListener((msg: ContentRequest, _sender, sendResponse) => {
     if (!msg || typeof msg.kind !== "string" || !msg.kind.startsWith("lb:")) return;

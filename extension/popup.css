@@ -1,14 +1,12 @@
 * { box-sizing: border-box; }
-body { width: 320px; margin: 0; font: 13px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #18181b; background: #fff; }
-header { display: flex; align-items: baseline; gap: 8px; padding: 14px 16px 10px; }
-.logo { font-weight: 700; font-size: 15px; letter-spacing: -.01em; }
-.tag { color: #71717a; font-size: 12px; }
-section { padding: 4px 16px 12px; }
-.lead { margin: 0 0 10px; color: #3f3f46; }
-.howto { margin: 0; padding-left: 18px; color: #3f3f46; }
-.howto li { margin: 6px 0; }
-.ic { width: 14px; height: 14px; vertical-align: -2px; margin: 0 1px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.note { margin: 12px 0 0; color: #71717a; font-size: 12px; }
-.dock-row { border-top: 1px solid #ececef; padding-top: 12px; }
-.dock-row label { display: flex; gap: 8px; align-items: center; cursor: pointer; color: #3f3f46; }
-.dock-row input { accent-color: #18181b; }
+body { width: 340px; margin: 0; font: 13px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #1d1b26; background: #fbfaff; }
+header { display: flex; align-items: baseline; gap: 8px; padding: 12px 14px; border-bottom: 1px solid #eee9f8; background: #fff; }
+.logo { font-weight: 800; color: #5b3fd6; font-size: 16px; }
+.tag { color: #6b6780; font-size: 12px; }
+section { padding: 10px 14px; border-bottom: 1px solid #eee9f8; }
+.lead { margin: 0 0 8px; color: #35324a; }
+.howto { margin: 0; padding-left: 18px; color: #35324a; }
+.howto li { margin: 5px 0; }
+.note { margin: 10px 0 0; color: #6b6780; font-size: 12px; }
+.dock-row label { display: flex; gap: 8px; align-items: center; cursor: pointer; color: #4a4660; }
+footer { padding: 8px 14px 12px; color: #8d89a3; font-size: 11px; }

@@ -1,5 +1,5 @@
 // The on-page widget. Always there, floating:
-//  • form pages: a dock on the right edge: Fill with AI · Copy form (scans + copies) · Paste into form (fills it)
+//  • form pages: a dock on the right edge  📋 Copy form (scans + copies)  ·  ✨ Paste into form (fills it)
 //  • chat pages: a small bar next to the message box  Paste (form → message box)  ·  Copy (AI reply → form)
 // Every button explains itself on hover. Nothing is ever sent or submitted for you.
 import { getHiddenHosts, HIDDEN_HOSTS_KEY, setHostHidden } from "../shared/prefs";
@@ -7,7 +7,7 @@ import { buildPrompt } from "../shared/protocol";
 import type { FillSummary } from "../shared/types";
 import type { ChatTab, WidgetBackend } from "./backend";
 import { diagnose, findComposer, findLatestReply, tryInsert } from "./chat";
-import { copyText, h, icon, type IconName } from "./dom";
+import { copyText, h } from "./dom";
 import { WIDGET_HOST_ID } from "./scanner";
 
 export interface WidgetOptions {
@@ -24,105 +24,98 @@ const CSS = `
 * { box-sizing: border-box; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
 .dock { position: fixed; right: 0; top: 40vh; z-index: 2147483646; display: flex; align-items: flex-start; }
 .dock.off { display: none; }
-/* Form pages: a slim tab on the right edge. Hover it and it glides out; move away and it glides back. */
-.dock:not(.inline) { transform: translateX(calc(100% - 12px)); transition: transform .3s cubic-bezier(.2,.8,.2,1) .45s; }
-.dock:not(.inline) .pill { opacity: .55; transition: opacity .25s ease .45s; }
-.dock:not(.inline).has-form .pill { opacity: .95; } /* a form was found on this page */
+/* Form pages: a faint sliver on the right edge. Hover it and it glides out; move away and it glides back. */
+.dock:not(.inline) { transform: translateX(calc(100% - 16px)); transition: transform .34s cubic-bezier(.2,.8,.2,1) .5s; }
+.dock:not(.inline) .pill { opacity: .4; border-left: 3px solid rgba(109,77,255,.85); transition: opacity .25s ease .5s; }
+.dock:not(.inline).has-form .pill { opacity: .85; } /* a form was found on this page */
 .dock:not(.inline):hover, .dock:not(.inline).peek, .dock:not(.inline).dragging { transform: none; transition-delay: 0s; }
 .dock:not(.inline):hover .pill, .dock:not(.inline).peek .pill, .dock:not(.inline).dragging .pill { opacity: 1; transition-delay: 0s; }
-/* A wider invisible hover zone around the tab. */
+/* A wider invisible hover zone around the sliver. */
 .dock:not(.inline)::before { content: ""; position: absolute; left: -16px; top: -14px; bottom: -14px; width: 16px; }
-/* When a form is detected: a little shake and a soft ring, once. */
+/* When a form is detected: a little shake and a soft glow, once. */
 .dock:not(.inline).notice { animation: lbnudge 1.2s cubic-bezier(.36,.07,.19,.97); }
 .dock:not(.inline).notice .pill { animation: lbglow 1.8s ease-out; }
 @keyframes lbnudge {
-  0%, 100% { transform: translateX(calc(100% - 12px)); }
-  12% { transform: translateX(calc(100% - 38px)); }
-  26% { transform: translateX(calc(100% - 12px)); }
-  40% { transform: translateX(calc(100% - 30px)); }
-  54% { transform: translateX(calc(100% - 12px)); }
-  68% { transform: translateX(calc(100% - 22px)); }
-  82% { transform: translateX(calc(100% - 12px)); }
+  0%, 100% { transform: translateX(calc(100% - 16px)); }
+  12% { transform: translateX(calc(100% - 42px)); }
+  26% { transform: translateX(calc(100% - 16px)); }
+  40% { transform: translateX(calc(100% - 34px)); }
+  54% { transform: translateX(calc(100% - 16px)); }
+  68% { transform: translateX(calc(100% - 26px)); }
+  82% { transform: translateX(calc(100% - 16px)); }
 }
 @keyframes lbglow {
-  0% { box-shadow: 0 8px 28px rgba(30,40,70,.14), 0 0 0 0 rgba(90,100,125,.5); }
-  100% { box-shadow: 0 8px 28px rgba(30,40,70,.14), 0 0 0 12px rgba(90,100,125,0); }
+  0% { box-shadow: -6px 10px 30px rgba(20,10,50,.38), 0 0 0 0 rgba(109,77,255,.75); }
+  100% { box-shadow: -6px 10px 30px rgba(20,10,50,.38), 0 0 0 16px rgba(109,77,255,0); }
 }
 @media (prefers-reduced-motion: reduce) { .dock:not(.inline).notice { animation: none; } }
-/* Light frosted glass: a see-through white fill, a strong blur of whatever is behind, a bright rim. */
-.pill { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 6px 6px 8px;
-  background: linear-gradient(145deg, rgba(255,255,255,.55), rgba(255,255,255,.12)), rgba(255,255,255,.1);
-  border: 1px solid rgba(255,255,255,.6); border-right: 0; border-radius: 16px 0 0 16px;
-  box-shadow: 0 8px 28px rgba(30,40,70,.14), inset 0 1px 0 rgba(255,255,255,.8);
-  backdrop-filter: blur(26px) saturate(180%); -webkit-backdrop-filter: blur(26px) saturate(180%); }
-.top { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 2px; }
-.hide { border: 0; background: none; color: #586071; line-height: 0; cursor: pointer; padding: 3px; border-radius: 6px; display: flex; }
-.hide:hover { color: #000; background: rgba(0,0,0,.07); }
-.grip { flex: 1; height: 18px; cursor: grab; display: flex; align-items: center; justify-content: center;
-  color: #7a8191; user-select: none; touch-action: none; }
-.grip:hover { color: #3b4252; }
+.pill { position: relative; display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 6px 7px 9px;
+  background: rgba(27,24,42,.94); border: 1px solid rgba(255,255,255,.1); border-right: 0; border-radius: 20px 0 0 20px;
+  box-shadow: -6px 10px 30px rgba(20,10,50,.38); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+.top { display: flex; align-items: center; width: 100%; gap: 2px; }
+.hide { border: 0; background: none; color: rgba(255,255,255,.35); font-size: 16px; line-height: 1; cursor: pointer; padding: 0 3px; }
+.hide:hover { color: #fff; }
+.grip { flex: 1; height: 14px; cursor: grab; display: flex; align-items: center; justify-content: center;
+  color: rgba(255,255,255,.35); font-size: 11px; letter-spacing: 1px; user-select: none; touch-action: none; }
+.grip:hover { color: rgba(255,255,255,.7); }
 .grip:active { cursor: grabbing; }
-.btn { position: relative; border: 0; cursor: pointer; color: #1d2230; background: transparent; transition: background .15s, color .15s; }
-.btn:hover, .btn.icon:hover { background: rgba(255,255,255,.7); }
-.btn:active, .btn.icon:active { background: rgba(255,255,255,.85); }
-.btn:focus-visible { outline: 2px solid rgba(29,34,48,.55); outline-offset: 1px; }
-.btn:disabled { opacity: .5; cursor: default; }
-/* Each icon sits on its own soft tile so it stands apart from the glass. */
-.btn.icon { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
-  background: rgba(255,255,255,.38); box-shadow: inset 0 0 0 1px rgba(255,255,255,.7), 0 1px 4px rgba(30,40,70,.12); }
-.btn.word { padding: 6px 12px; border-radius: 8px; font-size: 12.5px; font-weight: 500; }
-.btn[data-tip]::after { content: attr(data-tip); position: absolute; right: calc(100% + 12px); top: 50%;
-  transform: translateY(-50%) translateX(4px); width: max-content; max-width: 220px; text-align: left; white-space: normal;
-  font: 400 12px/1.45 system-ui, sans-serif; padding: 8px 10px; border-radius: 8px;
-  background: rgba(255,255,255,.92); color: #1d2230; border: 1px solid rgba(0,0,0,.07); box-shadow: 0 6px 22px rgba(30,40,70,.18);
+.btn { position: relative; border: 0; cursor: pointer; color: #fff; background: rgba(255,255,255,.08);
+  transition: background .15s, transform .15s, box-shadow .15s; }
+.btn:hover { background: #6d4dff; transform: scale(1.06); box-shadow: 0 4px 14px rgba(109,77,255,.45); }
+.btn:active { transform: scale(.96); }
+.btn:focus-visible { outline: 2px solid #b6a6ff; outline-offset: 2px; }
+.btn:disabled { opacity: .55; cursor: default; transform: none; }
+.btn.emoji { width: 44px; height: 44px; border-radius: 50%; font-size: 21px; line-height: 1; display: flex; align-items: center; justify-content: center; }
+.btn.word { min-width: 68px; padding: 9px 14px; border-radius: 999px; font-size: 12.5px; font-weight: 700; letter-spacing: .02em; }
+.btn[data-tip]::after { content: attr(data-tip); position: absolute; right: calc(100% + 14px); top: 50%;
+  transform: translateY(-50%) translateX(6px); width: max-content; max-width: 240px; text-align: left; white-space: normal;
+  font: 500 12px/1.45 system-ui, sans-serif; letter-spacing: 0; padding: 9px 11px; border-radius: 11px;
+  background: #12101c; color: #ececf3; border: 1px solid rgba(255,255,255,.1); box-shadow: 0 10px 28px rgba(0,0,0,.4);
   opacity: 0; pointer-events: none; transition: opacity .15s, transform .15s; }
-.btn[data-tip]:hover::after { opacity: 1; transform: translateY(-50%); transition-delay: .3s; }
-/* A tooltip never shows on top of an open message, list or paste box. */
-.dock:has(.toast:not([hidden])) .btn[data-tip]::after, .dock:has(.panel:not([hidden])) .btn[data-tip]::after { display: none; }
-.toast, .panel { position: absolute; right: calc(100% + 12px); top: 0; color: #1d2230;
-  background: linear-gradient(145deg, rgba(255,255,255,.62), rgba(255,255,255,.2)), rgba(255,255,255,.12);
-  border: 1px solid rgba(255,255,255,.65); border-radius: 16px; box-shadow: 0 10px 32px rgba(30,40,70,.16), inset 0 1px 0 rgba(255,255,255,.85);
-  backdrop-filter: blur(26px) saturate(180%); -webkit-backdrop-filter: blur(26px) saturate(180%); font-size: 13px; line-height: 1.45; }
+.btn[data-tip]:hover::after { opacity: 1; transform: translateY(-50%); transition-delay: .25s; }
+.toast, .panel { position: absolute; right: calc(100% + 12px); top: 0; background: #12101c; color: #ececf3;
+  border: 1px solid rgba(255,255,255,.12); border-radius: 14px; box-shadow: 0 12px 34px rgba(0,0,0,.42); font-size: 13px; line-height: 1.45; }
 .toast { display: flex; align-items: center; gap: 9px; padding: 10px 12px; width: max-content; max-width: 320px; cursor: pointer; }
 .toast[hidden], .panel[hidden] { display: none; }
-.dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: #22a55b; }
-.dot.warn { background: #d99100; } .dot.error { background: #dc3f3f; }
-.act { border: 0; border-radius: 7px; padding: 5px 10px; background: #1d2230; color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; flex: none; }
-.act:hover { background: #000; }
-.panel { width: 300px; padding: 12px; }
-.ptitle { display: flex; align-items: center; justify-content: space-between; font-weight: 600; font-size: 13px; margin-bottom: 8px; }
-.pclose { border: 0; background: none; color: #586071; line-height: 0; cursor: pointer; padding: 3px; border-radius: 6px; display: flex; }
-.pclose:hover { color: #000; background: rgba(0,0,0,.07); }
-.panel textarea { width: 100%; height: 110px; resize: vertical; border: 1px solid rgba(0,0,0,.12); border-radius: 10px; padding: 8px;
-  background: rgba(255,255,255,.5); color: #1d2230; font: 12px/1.4 ui-monospace, Consolas, monospace; }
-.panel textarea:focus { outline: 1px solid rgba(29,34,48,.5); }
-.perr { color: #b42323; font-size: 12px; margin-top: 6px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: #22c55e; }
+.dot.warn { background: #f59e0b; } .dot.error { background: #ef4444; }
+.act { border: 0; border-radius: 8px; padding: 5px 10px; background: #6d4dff; color: #fff; font-size: 12px; font-weight: 700; cursor: pointer; flex: none; }
+.act:hover { background: #7d60ff; }
+.panel { width: 320px; padding: 12px; }
+.ptitle { display: flex; align-items: center; justify-content: space-between; font-weight: 700; margin-bottom: 8px; }
+.pclose { border: 0; background: none; color: #9a97ad; font-size: 18px; line-height: 1; cursor: pointer; padding: 0 2px; }
+.pclose:hover { color: #fff; }
+.panel textarea { width: 100%; height: 110px; resize: vertical; border: 1px solid rgba(255,255,255,.15); border-radius: 10px; padding: 8px;
+  background: #1b182a; color: #ececf3; font: 12px/1.4 ui-monospace, Consolas, monospace; }
+.panel textarea:focus { outline: 2px solid #6d4dff; }
+.perr { color: #fca5a5; font-size: 12px; margin-top: 6px; }
 .prow { display: flex; gap: 8px; margin-top: 8px; }
-.mini { flex: 1; border: 1px solid rgba(0,0,0,.12); background: rgba(255,255,255,.45); color: #1d2230; border-radius: 10px; padding: 7px 10px; font-size: 12.5px; cursor: pointer; }
-.mini:hover { background: rgba(255,255,255,.8); }
-.mini.primary { background: #1d2230; border-color: #1d2230; color: #fff; font-weight: 600; }
-.mini.primary:hover { background: #000; }
-.mini:disabled { opacity: .5; cursor: default; }
-.tabrow { display: block; width: 100%; text-align: left; border: 1px solid rgba(0,0,0,.1); background: rgba(255,255,255,.45); color: #1d2230;
-  border-radius: 12px; padding: 8px 10px; margin-top: 6px; cursor: pointer; font-size: 12.5px; }
-.tabrow:hover, .tabrow:focus-visible { background: rgba(255,255,255,.85); border-color: rgba(0,0,0,.18); outline: none; }
-.tabrow b { display: block; font-size: 11px; font-weight: 500; color: #586071; margin-bottom: 1px; }
-.tabrow span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 270px; }
-.pnote { color: #586071; font-size: 11.5px; margin-top: 10px; }
-/* Chat pages: a small chip that floats next to the message box instead of the screen edge. */
+.mini { flex: 1; border: 1px solid rgba(255,255,255,.18); background: transparent; color: #ececf3; border-radius: 9px; padding: 7px 10px; font-size: 12.5px; cursor: pointer; }
+.mini:hover { background: rgba(255,255,255,.08); }
+.mini.primary { background: #6d4dff; border-color: #6d4dff; font-weight: 700; }
+.mini.primary:hover { background: #7d60ff; }
+.mini:disabled { opacity: .55; cursor: default; }
+.tabrow { display: block; width: 100%; text-align: left; border: 1px solid rgba(255,255,255,.14); background: transparent; color: #ececf3;
+  border-radius: 10px; padding: 8px 10px; margin-top: 7px; cursor: pointer; font-size: 12.5px; }
+.tabrow:hover, .tabrow:focus-visible { background: #6d4dff; border-color: #6d4dff; outline: none; }
+.tabrow b { display: block; font-size: 11.5px; color: #b6a6ff; }
+.tabrow:hover b, .tabrow:focus-visible b { color: #fff; }
+.tabrow span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 290px; }
+.pnote { color: #9a97ad; font-size: 11.5px; margin-top: 9px; }
+/* Chat pages: a small bar that floats next to the message box instead of the screen edge. */
 .dock.inline { left: auto; top: 0; }
 .dock.inline .top { display: none; }
-.dock.inline .pill { flex-direction: row; align-items: center; gap: 0; padding: 3px; border: 1px solid rgba(255,255,255,.6); border-radius: 999px;
-  background: linear-gradient(145deg, rgba(255,255,255,.55), rgba(255,255,255,.12)), rgba(255,255,255,.1);
-  box-shadow: 0 6px 20px rgba(30,40,70,.14), inset 0 1px 0 rgba(255,255,255,.8);
-  backdrop-filter: blur(26px) saturate(180%); -webkit-backdrop-filter: blur(26px) saturate(180%); opacity: .65; transition: opacity .25s ease; }
+.dock.inline .pill { flex-direction: row; align-items: center; gap: 0; padding: 4px; border: 1px solid rgba(255,255,255,.12); border-radius: 999px;
+  box-shadow: 0 6px 20px rgba(20,10,50,.3); opacity: .5; transition: opacity .25s ease, box-shadow .25s ease; }
 .dock.inline:hover .pill, .dock.inline.peek .pill { opacity: 1; }
 /* Idle: just a small chip beside the message box. Hover it and Paste / Copy unfold to its left. */
-.dock.inline .chip { width: 26px; height: 26px; flex: none; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-  color: #1d2230; user-select: none; }
-.dock.inline .btns { display: none; align-items: center; gap: 2px; margin-right: 4px; }
-.dock.inline:hover .btns, .dock.inline.peek .btns { display: flex; animation: lbpop .2s cubic-bezier(.2,.8,.2,1); }
-@keyframes lbpop { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: none; } }
+.dock.inline .chip { width: 28px; height: 28px; flex: none; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #6d4dff, #9a7bff); color: #fff; font-size: 13px; line-height: 1; user-select: none; }
+.dock.inline .btns { display: none; align-items: center; gap: 4px; margin-right: 6px; }
+.dock.inline:hover .btns, .dock.inline.peek .btns { display: flex; animation: lbpop .24s cubic-bezier(.2,.8,.2,1); }
+@keyframes lbpop { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: none; } }
+.dock.inline .btn.word { min-width: 0; padding: 6px 13px; font-size: 12px; }
+.dock.inline .hide { font-size: 14px; padding: 0 4px; }
 .dock.inline .toast, .dock.inline .panel { right: 0; left: auto; top: auto; bottom: calc(100% + 10px); }
 .dock.inline .btn[data-tip]::after { right: auto; left: 50%; top: auto; bottom: calc(100% + 12px); transform: translateX(-50%) translateY(4px); }
 .dock.inline .btn[data-tip]:hover::after { transform: translateX(-50%); }
@@ -174,12 +167,6 @@ function describeFill(s: FillSummary, where = ""): { text: string; tone: Tone } 
 
 export function mountWidget(opts: WidgetOptions): { destroy(): void } {
   document.getElementById(WIDGET_HOST_ID)?.remove();
-  // Only one copy of the widget may live on a page. Each copy stamps the page with its own token; a copy that
-  // finds a different token (a newer copy took over) or a dead extension connection (the extension was reloaded)
-  // removes itself instead of fighting to re-add its widget.
-  const token = Math.random().toString(36).slice(2);
-  const OWNER_ATTR = "data-lazyboi-owner";
-  document.documentElement.setAttribute(OWNER_ATTR, token);
   const { backend } = opts;
   const cleanups: (() => void)[] = [];
   const listen = <T extends EventTarget>(t: T, type: string, fn: EventListener, capture = false) => {
@@ -200,8 +187,8 @@ export function mountWidget(opts: WidgetOptions): { destroy(): void } {
 
   const dock = h("div", { class: opts.mode === "chat" ? "dock off inline" : "dock off" });
   const pill = h("div", { class: "pill" });
-  const grip = h("div", { class: "grip", title: "Drag to move" }, icon("grip", 14));
-  const hideBtn = h("button", { class: "hide", type: "button", title: "Hide lazyBoi on this site", "aria-label": "Hide lazyBoi on this site" }, icon("close", 14));
+  const grip = h("div", { class: "grip", title: "Drag to move" }, "⋮⋮");
+  const hideBtn = h("button", { class: "hide", type: "button", title: "Hide lazyBoi on this site", "aria-label": "Hide lazyBoi on this site" }, "×");
   const toastBox = h("div", { class: "toast", role: "status", "aria-live": "polite" });
   toastBox.hidden = true;
   const panel = h("div", { class: "panel" });
@@ -212,8 +199,8 @@ export function mountWidget(opts: WidgetOptions): { destroy(): void } {
   pill.append(h("div", { class: "top" }, grip, hideBtn));
   root.append(dock);
 
-  const button = (kind: "icon" | "word", content: IconName | string, label: string, tip: string) =>
-    h("button", { class: `btn ${kind}`, type: "button", "aria-label": label, "data-tip": tip }, kind === "icon" ? icon(content as IconName, 19) : content);
+  const button = (kind: "emoji" | "word", text: string, label: string, tip: string) =>
+    h("button", { class: `btn ${kind}`, type: "button", "aria-label": label, "data-tip": tip }, text);
 
   // ---- toast ----
   let toastTimer = 0;
@@ -291,7 +278,7 @@ export function mountWidget(opts: WidgetOptions): { destroy(): void } {
   const perr = h("div", { class: "perr" });
   const pasteClip = h("button", { class: "mini", type: "button" }, "Paste clipboard");
   const go = h("button", { class: "mini primary", type: "button" }, "Fill form");
-  const closeX = h("button", { class: "pclose", type: "button", title: "Close (Esc)", "aria-label": "Close" }, icon("close", 14));
+  const closeX = h("button", { class: "pclose", type: "button", title: "Close (Esc)", "aria-label": "Close" }, "×");
   panel.append(h("div", { class: "ptitle" }, "Paste the AI's reply", closeX), ta, perr, h("div", { class: "prow" }, pasteClip, go));
 
   function openPanel(message = "") {
@@ -314,7 +301,7 @@ export function mountWidget(opts: WidgetOptions): { destroy(): void } {
   function openPicker(tabs: ChatTab[], onPick: (t: ChatTab) => void) {
     hideToast();
     closePanel();
-    const x = h("button", { class: "pclose", type: "button", title: "Close (Esc)", "aria-label": "Close" }, icon("close", 14));
+    const x = h("button", { class: "pclose", type: "button", title: "Close (Esc)", "aria-label": "Close" }, "×");
     x.addEventListener("click", () => closePanel());
     const rows = tabs.map((t) => {
       const b = h("button", { class: "tabrow", type: "button" }, h("b", {}, t.host || "chat"), h("span", {}, t.title || "(untitled)"));
@@ -375,11 +362,11 @@ export function mountWidget(opts: WidgetOptions): { destroy(): void } {
 
   // ---- buttons ----
   if (opts.mode === "form") {
-    const copyBtn = button("icon", "copy", "Copy form", "Copy form: scans this page and copies a prompt for your AI chat.");
-    const fillBtn = button("icon", "paste", "Paste into form", "Paste into form: fills this form from the AI's reply. You can undo, and you press Submit yourself.");
+    const copyBtn = button("emoji", "📋", "Copy form", "Copy form: scans this page and copies a prompt for your AI chat.");
+    const fillBtn = button("emoji", "✨", "Paste into form", "Paste into form: fills this form from the AI's reply. You can undo, and you press Submit yourself.");
     const aiBtn = button(
-      "icon",
-      "bolt",
+      "emoji",
+      "⚡",
       "Fill with AI",
       "Fill with AI: pick one of your open chat tabs. lazyBoi sends the form there, waits for the reply, and fills this page. You can undo.",
     );
@@ -393,7 +380,7 @@ export function mountWidget(opts: WidgetOptions): { destroy(): void } {
       if (!r.schema.fields.length) return toast("No fillable fields found on this page.", "error");
       const t = await backend.chatTabs();
       if (!t.ok) return toast(t.error, "error");
-      if (!t.tabs.length) return toast("No chat tab is open. Open claude.ai, ChatGPT or another supported chat, then press Fill with AI again.", "error");
+      if (!t.tabs.length) return toast("No chat tab is open. Open claude.ai, ChatGPT or another supported chat, then press ⚡ again.", "error");
       openPicker(t.tabs, async (tab) => {
         asking = true;
         toast(`Asking ${tab.host || "the chat"}… this can take a minute.`, "ok", undefined, true);
@@ -432,13 +419,13 @@ export function mountWidget(opts: WidgetOptions): { destroy(): void } {
 
     // Any fill on this page (from here or from the chat tab) is reported with Undo.
     listen(document, "lazyboi-filled", ((e: CustomEvent<FillSummary>) => {
-      if (!asking) reportFill(e.detail); // while Fill with AI is working, the combined result is reported once at the end
+      if (!asking) reportFill(e.detail); // while ⚡ is working, the combined result is reported once at the end
     }) as EventListener);
   } else {
     const pasteBtn = button("word", "Paste", "Paste form", "Paste: puts the form you copied into this chat's message box. You press Send.");
     const copyBtn = button("word", "Copy", "Copy reply", "Copy: copies the AI's lazyBoi reply so your form can fill from it.");
-    const hideInline = h("button", { class: "hide", type: "button", title: "Hide lazyBoi on this site", "aria-label": "Hide lazyBoi on this site" }, icon("close", 14));
-    pill.append(h("div", { class: "btns" }, pasteBtn, copyBtn, hideInline), h("div", { class: "chip", "aria-hidden": "true" }, icon("sparkle", 16)));
+    const hideInline = h("button", { class: "hide", type: "button", title: "Hide lazyBoi on this site", "aria-label": "Hide lazyBoi on this site" }, "×");
+    pill.append(h("div", { class: "btns" }, pasteBtn, copyBtn, hideInline), h("div", { class: "chip", "aria-hidden": "true" }, "✦"));
 
     guard(pasteBtn, async () => {
       const r = await backend.latestForm();
@@ -458,7 +445,7 @@ export function mountWidget(opts: WidgetOptions): { destroy(): void } {
       const copied = await copyText(clean);
       const q = await backend.queueReply(clean);
       if (!q.ok) return toast(`${copied ? "Copied, but " : ""}${q.error.charAt(0).toLowerCase()}${q.error.slice(1)}`, "warn");
-      toast(`Reply copied. Press Paste into form on “${q.formTitle}”.`, "ok", {
+      toast(`Reply copied. Press ✨ on “${q.formTitle}”.`, "ok", {
         label: "Fill now",
         run: async () => {
           const r = await backend.submitReply(clean);
@@ -703,13 +690,6 @@ export function mountWidget(opts: WidgetOptions): { destroy(): void } {
   // If that happens, put the widget back.
   let reattached = 0;
   const keepAttached = () => {
-    const orphaned = typeof chrome !== "undefined" && !!chrome.runtime && !chrome.runtime.id;
-    if (orphaned || document.documentElement.getAttribute(OWNER_ATTR) !== token) {
-      cleanups.forEach((fn) => fn());
-      cleanups.length = 0;
-      host.remove();
-      return;
-    }
     if (!host.isConnected) {
       if (reattached >= 30) return;
       reattached++;
